@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  docs:
+    name: Check Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Markdown files exist
+        run: |
+          echo "Verifying core documentation..."
+          test -f README.md
+          test -f docs/ARCHITECTURE.md
+          test -f docs/MEMORY_MODEL.md
+          test -f docs/SYNTAX.md
+          test -f docs/COMPILER.md
+          test -f docs/ROADMAP.md
+          test -f LICENSE
+          test -f CONTRIBUTING.md
+          echo "All core documentation files are present."
+
+      - name: List project structure
+        run: |
+          echo "Project structure:"
+          find . -type f -not -path './.git/*' | sort
+
+  # Future jobs will be added here:
+  # - build-compiler
+  # - test
+  # - wasm-build
+  # - clippy / rustfmt when the Rust compiler code lands
