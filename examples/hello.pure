@@ -1,0 +1,6 @@
+// PureLang Hello World - Easy Syntax
+
+fn main() {
+    print "Hello, PureLang!"
+    print "Native speed. Absolute safety. Beautiful syntax."
+}

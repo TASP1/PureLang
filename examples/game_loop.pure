@@ -1,0 +1,20 @@
+// Simple game-style loop example
+
+fn main() {
+    mut health = 100
+    name = "Player"
+
+    print "Welcome, " + name
+
+    for i in 1..5 {
+        health = health - 10
+        print "Health: " + health
+
+        if health <= 0 {
+            print "Game Over"
+            return
+        }
+    }
+
+    print "You survived!"
+}
