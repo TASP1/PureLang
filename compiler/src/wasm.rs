@@ -333,7 +333,7 @@ impl WasmCodegen {
                 }
             },
             Expr::Range { start, .. } => self.emit_expr(start),
-            Expr::List(_) | Expr::Call { .. } | Expr::Field { .. } => {
+            Expr::List(_) | Expr::Call { .. } | Expr::Field { .. } | Expr::Index { .. } => {
                 self.errors.push("wasm: unsupported expression".into());
                 self.body.push("    i64.const 0".into());
             }

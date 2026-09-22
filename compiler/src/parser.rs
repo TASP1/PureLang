@@ -329,6 +329,15 @@ impl Parser {
                         field,
                     };
                 }
+                Token::LBracket => {
+                    self.advance();
+                    let index = self.parse_expr()?;
+                    self.expect(Token::RBracket)?;
+                    expr = Expr::Index {
+                        object: Box::new(expr),
+                        index: Box::new(index),
+                    };
+                }
                 _ => break,
             }
         }

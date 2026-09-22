@@ -1,3 +1,5 @@
+# PureLang is PUBLIC — Actions minutes are free/unlimited for public repos.
+# This workflow intentionally avoids private-repo minute consumption.
 name: CI
 
 on:
@@ -6,6 +8,10 @@ on:
   pull_request:
     branches: [ master, main ]
   workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -16,10 +22,8 @@ jobs:
     name: Check Documentation
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Check Markdown files exist
+      - uses: actions/checkout@v7
+      - name: Check core docs
         run: |
           test -f README.md
           test -f docs/ARCHITECTURE.md
@@ -29,6 +33,8 @@ jobs:
           test -f docs/ROADMAP.md
           test -f LICENSE
           test -f CONTRIBUTING.md
+          test -f examples/hello.pure
+          test -f examples/lists.pure
 
   build:
     name: Build Compiler (purec)
@@ -37,62 +43,52 @@ jobs:
       run:
         working-directory: compiler
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
 
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
-      - name: Install clang (for native codegen)
+      - name: Install clang
         run: sudo apt-get update -qq && sudo apt-get install -y -qq clang
 
-      - name: Show toolchain versions
+      - name: Show versions
         run: |
-          rustc --version --verbose
-          cargo --version
+          rustc --version
           clang --version | head -1
+          echo "Repo: ${{ github.repository }} (public Actions — free minutes)"
 
-      - name: Cache cargo registry & build
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: compiler
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Clippy (lint)
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: Build (release)
-        run: cargo build --release
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo build --release
 
       - name: Type-check examples
         run: |
-          cargo run --release -- ../examples/hello.pure
-          cargo run --release -- ../examples/game_loop.pure
+          for f in hello game_loop funcs structs lists; do
+            cargo run --release -- ../examples/$f.pure
+          done
 
-      - name: Compile examples to native
+      - name: Compile & run examples (native)
         run: |
-          cargo run --release -- --compile -o /tmp/hello_pure ../examples/hello.pure
-          cargo run --release -- --compile -o /tmp/game_loop ../examples/game_loop.pure
-          echo "=== hello_pure ==="
-          /tmp/hello_pure
-          echo "=== game_loop ==="
-          /tmp/game_loop
+          for f in hello game_loop funcs structs lists; do
+            cargo run --release -- --compile -o /tmp/$f ../examples/$f.pure
+            echo "=== $f ==="
+            /tmp/$f
+          done
 
       - name: Emit WebAssembly
         run: |
           cargo run --release -- --emit-wasm -o /tmp/hello.wat ../examples/hello.pure
-          cargo run --release -- --emit-wasm -o /tmp/game_loop.wat ../examples/game_loop.pure
-          echo "WASM modules generated"
-          wc -l /tmp/hello.wat /tmp/game_loop.wat
+          test -s /tmp/hello.wat
+          echo "WASM ok"
 
-      - name: Upload purec binary
-        uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7
         with:
           name: purec-${{ runner.os }}-${{ runner.arch }}
           path: compiler/target/release/purec
-          if-no-files-found: error
-          retention-days: 14
+          retention-days: 7

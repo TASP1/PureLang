@@ -29,6 +29,8 @@ enum VarKind {
     String,
     /// Pointer to a struct value on the stack
     Struct,
+    /// Pointer to heap list: [i64 len][i64 elems...]
+    List,
 }
 
 impl Codegen {
@@ -212,7 +214,7 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String | VarKind::Struct => {
+                        VarKind::String | VarKind::Struct | VarKind::List => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -225,7 +227,7 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String | VarKind::Struct => {
+                        VarKind::String | VarKind::Struct | VarKind::List => {
                             let _ = writeln!(self.body, "  {} = alloca ptr, align 8", ptr);
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
@@ -242,7 +244,7 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String | VarKind::Struct => {
+                        VarKind::String | VarKind::Struct | VarKind::List => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -440,8 +442,7 @@ impl Codegen {
                     fmt, val
                 );
             }
-            VarKind::Struct => {
-                // print as pointer address for now
+            VarKind::Struct | VarKind::List => {
                 let fmt = self.fresh();
                 let _ = writeln!(
                     self.body,
@@ -485,7 +486,7 @@ impl Codegen {
                                 loaded, ptr
                             );
                         }
-                        VarKind::String | VarKind::Struct => {
+                        VarKind::String | VarKind::Struct | VarKind::List => {
                             let _ = writeln!(
                                 self.body,
                                 "  {} = load ptr, ptr {}, align 8",
@@ -561,9 +562,50 @@ impl Codegen {
                 (res, VarKind::Number)
             }
             Expr::Range { start, .. } => self.emit_expr(start),
-            Expr::List(_) => {
-                self.errors.push("codegen: lists not supported yet".into());
-                ("0".into(), VarKind::Number)
+            Expr::List(elements) => {
+                let n = elements.len() as i64;
+                let bytes = (n + 1) * 8;
+                let ptr = self.fresh();
+                let _ = writeln!(self.body, "  {} = call ptr @malloc(i64 {})", ptr, bytes);
+                // store length
+                let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", n, ptr);
+                for (i, el) in elements.iter().enumerate() {
+                    let (v, k) = self.emit_expr(el);
+                    if k != VarKind::Number {
+                        self.errors
+                            .push("codegen: list elements must be numbers for now".into());
+                    }
+                    let ep = self.fresh();
+                    let _ = writeln!(
+                        self.body,
+                        "  {} = getelementptr inbounds i64, ptr {}, i64 {}",
+                        ep,
+                        ptr,
+                        i + 1
+                    );
+                    let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", v, ep);
+                }
+                (ptr, VarKind::List)
+            }
+            Expr::Index { object, index } => {
+                let (obj, okind) = self.emit_expr(object);
+                let (idx, _) = self.emit_expr(index);
+                if okind != VarKind::List {
+                    self.errors.push("codegen: indexing non-list".into());
+                    return ("0".into(), VarKind::Number);
+                }
+                // ptr[0] = len, ptr[1+] = elems → offset = index + 1
+                let off = self.fresh();
+                let _ = writeln!(self.body, "  {} = add i64 {}, 1", off, idx);
+                let ep = self.fresh();
+                let _ = writeln!(
+                    self.body,
+                    "  {} = getelementptr inbounds i64, ptr {}, i64 {}",
+                    ep, obj, off
+                );
+                let loaded = self.fresh();
+                let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", loaded, ep);
+                (loaded, VarKind::Number)
             }
             Expr::Call { callee, args } => {
                 // Struct construction or function call
@@ -612,6 +654,11 @@ impl Codegen {
             }
             Expr::Field { object, field } => {
                 let (obj, kind) = self.emit_expr(object);
+                if field == "length" && kind == VarKind::List {
+                    let loaded = self.fresh();
+                    let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", loaded, obj);
+                    return (loaded, VarKind::Number);
+                }
                 if kind != VarKind::Struct {
                     self.errors
                         .push("codegen: field access on non-struct".into());
@@ -683,7 +730,7 @@ impl Codegen {
     fn ensure_string(&mut self, val: String, kind: VarKind) -> String {
         match kind {
             VarKind::String => val,
-            VarKind::Struct => val, // best-effort
+            VarKind::Struct | VarKind::List => val,
             VarKind::Number => {
                 let buf = self.fresh();
                 let _ = writeln!(self.body, "  {} = call ptr @malloc(i64 32)", buf);

@@ -88,6 +88,11 @@ pub enum Expr {
         object: Box<Expr>,
         field: String,
     },
+    /// `list[index]`
+    Index {
+        object: Box<Expr>,
+        index: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

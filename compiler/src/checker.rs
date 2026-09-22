@@ -389,6 +389,21 @@ impl TypeChecker {
                     }
                 }
             }
+            Expr::Index { object, index } => {
+                let obj_ty = self.check_expr(object);
+                let idx_ty = self.check_expr(index);
+                if idx_ty != Type::Number && idx_ty != Type::Unknown {
+                    self.error(format!("List index must be Number, found {}", idx_ty));
+                }
+                match obj_ty {
+                    Type::List(inner) => *inner,
+                    Type::Unknown => Type::Unknown,
+                    other => {
+                        self.error(format!("Cannot index type {}", other));
+                        Type::Unknown
+                    }
+                }
+            }
         }
     }
 

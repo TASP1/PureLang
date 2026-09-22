@@ -1,0 +1,12 @@
+// Lists: literal, length, indexing
+
+fn main() {
+    nums = [10, 20, 30, 40]
+    print nums.length
+    print nums[0]
+    print nums[1]
+    print nums[2]
+    print nums[3]
+    total = nums[0] + nums[1] + nums[2] + nums[3]
+    print total
+}

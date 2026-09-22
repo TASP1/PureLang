@@ -4,7 +4,7 @@
 
 The PureLang compiler is called **`purec`**.
 
-It is written in Rust and currently at **Phase 1 complete (Lexer + Parser + Type Checker + LLVM + WASM)**.
+It is written in Rust and currently at **v0.7.0 — Phase 1 complete + Phase 2 in progress (functions, structs, lists)**.
 
 ## Current Implementation
 
@@ -65,4 +65,4 @@ Errors should be:
 
 ## Next Immediate Step
 
-Expand language features (structs, calls) and stdlib.
+Next: methods, enums, full borrow checker, stdlib.

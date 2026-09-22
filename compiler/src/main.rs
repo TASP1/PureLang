@@ -29,7 +29,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.6.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
+        println!("purec 0.7.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
         return;
     }
 
@@ -261,7 +261,7 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.6.0");
+    eprintln!("PureLang Compiler (purec) v0.7.0");
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  purec <file.pure>              Type-check");
@@ -395,6 +395,11 @@ fn print_expr(expr: &Expr, level: usize) {
         Expr::Field { object, field } => {
             println!("{}Field({})", indent(level), field);
             print_expr(object, level + 1);
+        }
+        Expr::Index { object, index } => {
+            println!("{}Index", indent(level));
+            print_expr(object, level + 1);
+            print_expr(index, level + 1);
         }
     }
 }

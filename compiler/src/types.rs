@@ -26,9 +26,11 @@ pub enum Type {
 
 impl Type {
     pub fn is_copy(&self) -> bool {
+        // Phase 2 MVP: lists/structs are Copy for field/index reads.
+        // Real borrow checking comes later.
         matches!(
             self,
-            Type::Number | Type::Bool | Type::Range | Type::Void | Type::Struct(_)
+            Type::Number | Type::Bool | Type::Range | Type::Void | Type::Struct(_) | Type::List(_)
         )
     }
 

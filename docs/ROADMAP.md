@@ -11,6 +11,8 @@
 - [x] **WebAssembly backend**
 - [ ] Standard library
 
+> **Note:** PureLang is a **public** repository. CI uses free public GitHub Actions minutes (does not consume private-repo Actions quotas).
+
 ## Phase 1 — Minimal Viable Compiler (In Progress)
 
 **Goal**: Tokenize → Parse → Generate simple native code
@@ -29,13 +31,13 @@
 
 - [x] User-defined functions + calls + return values
 - [x] Structs (declaration, construction, field access)
+- [x] Lists (literal, length, indexing)
 - [ ] Full ownership & borrow checker
 - [ ] Methods, enums
 - [ ] Pattern matching
 - [ ] Generics / traits
 - [ ] Error handling with `?`
 - [ ] Modules and visibility
-- [ ] Lists as first-class runtime values
 
 ## Phase 3 — Performance & Platforms
 

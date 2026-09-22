@@ -7,96 +7,111 @@
 - **Syntax far easier than Python**
 - Native execution on desktop, mobile, web, and consoles
 
+**Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
+**Compiler:** `purec` **v0.7.0**
+
 ## Quick Example
 
 ```pure
+fn add(a, b) {
+    return a + b
+}
+
+struct Point {
+    x
+    y
+}
+
 fn main() {
-    mut health = 100
-    name = "Player"
+    print add(40, 2)
 
-    print "Welcome, " + name
+    p = Point(3, 4)
+    print p.x + p.y
 
-    for i in 1..5 {
-        health = health - 10
-        print "Health: " + health
-
-        if health <= 0 {
-            print "Game Over"
-            return
-        }
-    }
-
-    print "You survived!"
+    nums = [10, 20, 30]
+    print nums.length
+    print nums[0]
 }
 ```
 
-## Current Status
+## Current Status (September 2026)
 
+### Done
 - [x] Public repository & design documents
-- [x] **Lexer complete**
-- [x] **Parser + AST complete**
-- [x] **Type & Ownership checker**
-- [x] **LLVM code generation** (native binaries!)
-- [x] **WebAssembly target** (WASI .wat)
-- [x] **Functions + calls**
-- [x] **Structs** (construct + fields)
+- [x] **Lexer**
+- [x] **Parser + AST**
+- [x] **Type & ownership checker** (MVP)
+- [x] **LLVM codegen** → native binaries (`clang`)
+- [x] **WebAssembly** (WASI `.wat`)
+- [x] **Functions** (define, call, return)
+- [x] **Structs** (declare, construct, fields)
+- [x] **Lists** (literal, `.length`, indexing `list[i]`)
+- [x] CI on **public** GitHub Actions (free unlimited minutes)
 
-## Project Structure
-
-```
-PureLang/
-├── compiler/           # purec compiler (Rust)
-│   └── src/
-│       ├── main.rs
-│       ├── lexer.rs
-│       ├── token.rs
-│       ├── ast.rs
-│       ├── parser.rs
-│       ├── types.rs
-│       ├── checker.rs
-│       ├── codegen.rs
-│       └── wasm.rs
-├── docs/               # Full design documentation
-│   ├── ARCHITECTURE.md
-│   ├── SYNTAX.md
-│   ├── MEMORY_MODEL.md
-│   ├── COMPILER.md
-│   └── ROADMAP.md
-├── examples/           # .pure example programs
-├── .github/workflows/  # CI
-├── README.md
-├── LICENSE
-└── CONTRIBUTING.md
-```
+### Next
+- [ ] Methods, enums, pattern matching
+- [ ] Full borrow checker
+- [ ] Generics / modules
+- [ ] Standard library
+- [ ] Formatter / LSP
 
 ## Try it
 
+Requires: **Rust** (stable), **clang** (native), optional **wasmtime** (WASM).
+
 ```bash
-cd compiler
+git clone https://github.com/TASP1/PureLang.git
+cd PureLang/compiler
 cargo build --release
 
 # Type-check
 cargo run --release -- ../examples/hello.pure
 
-# Compile to native binary (requires clang)
+# Native binary
 cargo run --release -- --compile -o hello ../examples/hello.pure
 ./hello
 
-cargo run --release -- --compile -o game ../examples/game_loop.pure
-./game
+# Functions / structs / lists
+cargo run --release -- --compile -o funcs ../examples/funcs.pure && ./funcs
+cargo run --release -- --compile -o structs ../examples/structs.pure && ./structs
+cargo run --release -- --compile -o lists ../examples/lists.pure && ./lists
 
-# Emit LLVM IR only
-cargo run --release -- --emit-ir ../examples/hello.pure
-
-# Emit WebAssembly (WASI)
+# WebAssembly
 cargo run --release -- --emit-wasm ../examples/hello.pure
 wasmtime hello.wat
+```
+
+## Project Structure
+
+```
+PureLang/
+├── compiler/           # purec (Rust)
+│   └── src/
+│       ├── main.rs     # CLI
+│       ├── lexer.rs / token.rs
+│       ├── parser.rs / ast.rs
+│       ├── types.rs / checker.rs
+│       ├── codegen.rs  # LLVM IR → native
+│       └── wasm.rs     # WASI .wat
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── SYNTAX.md
+│   ├── MEMORY_MODEL.md
+│   ├── COMPILER.md
+│   └── ROADMAP.md
+├── examples/
+│   ├── hello.pure
+│   ├── game_loop.pure
+│   ├── funcs.pure
+│   ├── structs.pure
+│   └── lists.pure
+└── .github/workflows/ci.yml
 ```
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
-- [Syntax (Easy Mode)](docs/SYNTAX.md)
+- [Syntax](docs/SYNTAX.md)
 - [Memory Model](docs/MEMORY_MODEL.md)
 - [Compiler Design](docs/COMPILER.md)
 - [Roadmap](docs/ROADMAP.md)
