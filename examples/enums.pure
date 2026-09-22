@@ -1,0 +1,40 @@
+// Enums + match
+
+enum Color {
+    Red
+    Green
+    Blue
+}
+
+enum Option {
+    Some(value)
+    None
+}
+
+fn main() {
+    c = Color.Red
+    match c {
+        Color.Red => print "red"
+        Color.Green => print "green"
+        Color.Blue => print "blue"
+    }
+
+    c2 = Color.Blue
+    match c2 {
+        Color.Red => print "r"
+        Color.Green => print "g"
+        Color.Blue => print "b"
+    }
+
+    o = Option.Some(42)
+    match o {
+        Option.Some(v) => print v
+        Option.None => print "none"
+    }
+
+    o2 = Option.None
+    match o2 {
+        Option.Some(v) => print v
+        Option.None => print "none"
+    }
+}

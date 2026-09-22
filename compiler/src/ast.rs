@@ -20,6 +20,19 @@ pub enum Item {
         name: String,
         fields: Vec<String>,
     },
+    /// `enum Color { Red Green Blue }` or with payload `Some(value)`
+    Enum {
+        name: String,
+        variants: Vec<EnumVariant>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
+pub struct EnumVariant {
+    pub name: String,
+    /// Optional payload field names (MVP: 0 or 1 Number payload)
+    pub fields: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,8 +68,35 @@ pub enum Stmt {
     },
     /// `return` or `return expr`
     Return(Option<Expr>),
+    /// `match expr { Pattern => block ... }`
+    Match {
+        expr: Expr,
+        arms: Vec<MatchArm>,
+    },
     /// Expression statement
     Expr(Expr),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
+pub struct MatchArm {
+    /// Pattern like `Color.Red` or `Option.Some(v)`
+    pub pattern: Pattern,
+    pub body: Block,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
+pub enum Pattern {
+    /// `EnumName.Variant` or `EnumName.Variant(bind)`
+    Variant {
+        enum_name: String,
+        variant: String,
+        /// Optional binding for payload
+        binding: Option<String>,
+    },
+    /// Wildcard `_` (future)
+    Wildcard,
 }
 
 #[derive(Debug, Clone, PartialEq)]

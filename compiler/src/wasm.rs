@@ -194,6 +194,10 @@ impl WasmCodegen {
             Stmt::Return(_) => {
                 self.body.push("    return".into());
             }
+            Stmt::Match { .. } => {
+                self.errors
+                    .push("wasm: match not yet supported in WASM backend".into());
+            }
             Stmt::Expr(expr) => {
                 self.emit_expr(expr);
                 self.body.push("    drop".into());

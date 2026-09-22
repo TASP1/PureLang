@@ -16,6 +16,8 @@ pub enum Token {
     In,
     Return,
     Struct,
+    Enum,
+    Match,
     Print,
     True,
     False,
@@ -32,6 +34,7 @@ pub enum Token {
     Greater,      // >
     LessEqual,    // <=
     GreaterEqual, // >=
+    FatArrow,     // =>
     DotDot,       // ..
     Dot,          // .
     Comma,
@@ -62,6 +65,8 @@ impl Token {
             "in" => Token::In,
             "return" => Token::Return,
             "struct" => Token::Struct,
+            "enum" => Token::Enum,
+            "match" => Token::Match,
             "print" => Token::Print,
             "true" => Token::True,
             "false" => Token::False,

@@ -19,6 +19,8 @@ pub struct Codegen {
     functions: HashMap<String, usize>,
     /// struct name → field names
     structs: HashMap<String, Vec<String>>,
+    /// enum name → list of (variant name, field count)
+    enums: HashMap<String, Vec<(String, usize)>>,
     current_is_main: bool,
     errors: Vec<String>,
 }
@@ -31,6 +33,8 @@ enum VarKind {
     Struct,
     /// Pointer to heap list: [i64 len][i64 elems...]
     List,
+    /// Enum value as i64: (tag << 32) | (payload as i32/i64 lower bits)
+    Enum,
 }
 
 impl Codegen {
@@ -47,6 +51,7 @@ impl Codegen {
             vars: HashMap::new(),
             functions: HashMap::new(),
             structs: HashMap::new(),
+            enums: HashMap::new(),
             current_is_main: true,
             errors: Vec::new(),
         }
@@ -55,7 +60,7 @@ impl Codegen {
     pub fn generate(&mut self, program: &Program) -> Result<String, Vec<String>> {
         self.emit_preamble();
 
-        // Register structs & functions first
+        // Register structs, enums & functions first
         for item in &program.items {
             match item {
                 Item::Struct { name, fields } => {
@@ -63,6 +68,13 @@ impl Codegen {
                     // %Point = type { i64, i64, ... }
                     let fields_ir = fields.iter().map(|_| "i64").collect::<Vec<_>>().join(", ");
                     let _ = writeln!(self.types_ir, "%{} = type {{ {} }}", name, fields_ir);
+                }
+                Item::Enum { name, variants } => {
+                    let vs: Vec<(String, usize)> = variants
+                        .iter()
+                        .map(|v| (v.name.clone(), v.fields.len()))
+                        .collect();
+                    self.enums.insert(name.clone(), vs);
                 }
                 Item::Function {
                     receiver,
@@ -261,7 +273,7 @@ impl Codegen {
                 let (val, kind) = self.emit_expr(value);
                 if let Some((ptr, _)) = self.vars.get(name).cloned() {
                     match kind {
-                        VarKind::Number => {
+                        VarKind::Number | VarKind::Enum => {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
@@ -273,7 +285,7 @@ impl Codegen {
                 } else {
                     let ptr = format!("%{}.addr", name);
                     match kind {
-                        VarKind::Number => {
+                        VarKind::Number | VarKind::Enum => {
                             let _ = writeln!(self.body, "  {} = alloca i64, align 8", ptr);
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
@@ -291,7 +303,7 @@ impl Codegen {
                 let (val, kind) = self.emit_expr(value);
                 if let Some((ptr, _)) = self.vars.get(name).cloned() {
                     match kind {
-                        VarKind::Number => {
+                        VarKind::Number | VarKind::Enum => {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
@@ -444,7 +456,7 @@ impl Codegen {
             Stmt::Return(Some(expr)) => {
                 let (v, kind) = self.emit_expr(expr);
                 if self.current_is_main {
-                    if kind == VarKind::Number {
+                    if kind == VarKind::Number || kind == VarKind::Enum {
                         let t = self.fresh();
                         let _ = writeln!(self.body, "  {} = trunc i64 {} to i32", t, v);
                         let _ = writeln!(self.body, "  ret i32 {}", t);
@@ -453,7 +465,7 @@ impl Codegen {
                     }
                 } else {
                     match kind {
-                        VarKind::Number => {
+                        VarKind::Number | VarKind::Enum => {
                             let _ = writeln!(self.body, "  ret i64 {}", v);
                         }
                         _ => {
@@ -463,6 +475,71 @@ impl Codegen {
                 }
                 let cont = self.fresh_label("after.ret");
                 let _ = writeln!(self.body, "{}:", cont);
+            }
+            Stmt::Match { expr, arms } => {
+                let (val, kind) = self.emit_expr(expr);
+                if kind != VarKind::Enum && kind != VarKind::Number {
+                    self.errors
+                        .push("codegen: match on non-enum value".into());
+                }
+                // Extract tag: val >> 32
+                let tag = self.fresh();
+                let _ = writeln!(self.body, "  {} = lshr i64 {}, 32", tag, val);
+                let end_label = self.fresh_label("match.end");
+                let mut arm_labels = Vec::new();
+                for (i, _) in arms.iter().enumerate() {
+                    arm_labels.push(self.fresh_label(&format!("match.arm{}", i)));
+                }
+                let default_label = self.fresh_label("match.default");
+                // Build switch
+                let _ = write!(self.body, "  switch i64 {}, label %{} [", tag, default_label);
+                for (i, arm) in arms.iter().enumerate() {
+                    if let Pattern::Variant {
+                        enum_name,
+                        variant,
+                        ..
+                    } = &arm.pattern
+                    {
+                        if let Some(variants) = self.enums.get(enum_name) {
+                            if let Some((idx, _)) =
+                                variants.iter().enumerate().find(|(_, (v, _))| v == variant)
+                            {
+                                let _ = write!(
+                                    self.body,
+                                    " i64 {}, label %{}",
+                                    idx, arm_labels[i]
+                                );
+                            }
+                        }
+                    }
+                }
+                let _ = writeln!(self.body, " ]");
+                // Arm bodies
+                for (i, arm) in arms.iter().enumerate() {
+                    let _ = writeln!(self.body, "{}:", arm_labels[i]);
+                    // Bind payload if needed: payload = val & 0xFFFFFFFF (sign-extend from lower 32)
+                    if let Pattern::Variant {
+                        binding: Some(b), ..
+                    } = &arm.pattern
+                    {
+                        let payload = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = and i64 {}, 4294967295",
+                            payload, val
+                        );
+                        let ptr = self.fresh(); // unique stack slot per arm
+                        let _ = writeln!(self.body, "  {} = alloca i64, align 8", ptr);
+                        let _ =
+                            writeln!(self.body, "  store i64 {}, ptr {}, align 8", payload, ptr);
+                        self.vars.insert(b.clone(), (ptr, VarKind::Number));
+                    }
+                    self.emit_block(&arm.body);
+                    let _ = writeln!(self.body, "  br label %{}", end_label);
+                }
+                let _ = writeln!(self.body, "{}:", default_label);
+                let _ = writeln!(self.body, "  br label %{}", end_label);
+                let _ = writeln!(self.body, "{}:", end_label);
             }
             Stmt::Expr(expr) => {
                 let _ = self.emit_expr(expr);
@@ -479,7 +556,7 @@ impl Codegen {
             && let Expr::String(s) = left.as_ref()
         {
             let (rval, rkind) = self.emit_expr(right);
-            if rkind == VarKind::Number {
+            if rkind == VarKind::Number || rkind == VarKind::Enum {
                 let g = self.intern_string(s);
                 let len = s.len() + 1;
                 let sptr = self.fresh();
@@ -532,7 +609,7 @@ impl Codegen {
                     fmt, val
                 );
             }
-            VarKind::Number => {
+            VarKind::Number | VarKind::Enum => {
                 let fmt = self.fresh();
                 let _ = writeln!(
                     self.body,
@@ -582,7 +659,7 @@ impl Codegen {
                 if let Some((ptr, kind)) = self.vars.get(name).cloned() {
                     let loaded = self.fresh();
                     match kind {
-                        VarKind::Number => {
+                        VarKind::Number | VarKind::Enum => {
                             let _ = writeln!(
                                 self.body,
                                 "  {} = load i64, ptr {}, align 8",
@@ -752,8 +829,43 @@ impl Codegen {
                         return (res, VarKind::Number);
                     }
                 }
-                // Method call: obj.method(args) → call @Struct_method(obj, args...)
+                // Enum variant with payload: Option.Some(42) → (tag << 32) | payload
                 if let Expr::Field { object, field } = callee.as_ref() {
+                    if let Expr::Ident(enum_name) = object.as_ref() {
+                        if let Some(variants) = self.enums.get(enum_name).cloned() {
+                            if let Some((idx, (_, nfields))) =
+                                variants.iter().enumerate().find(|(_, (v, _))| v == field)
+                            {
+                                if *nfields == args.len() {
+                                    let mut payload_val = "0".to_string();
+                                    if !args.is_empty() {
+                                        let (v, _) = self.emit_expr(&args[0]);
+                                        payload_val = v;
+                                    }
+                                    // pack: (idx << 32) | (payload & 0xFFFFFFFF)
+                                    let shifted = self.fresh();
+                                    let _ = writeln!(
+                                        self.body,
+                                        "  {} = shl i64 {}, 32",
+                                        shifted, idx
+                                    );
+                                    let masked = self.fresh();
+                                    let _ = writeln!(
+                                        self.body,
+                                        "  {} = and i64 {}, 4294967295",
+                                        masked, payload_val
+                                    );
+                                    let packed = self.fresh();
+                                    let _ = writeln!(
+                                        self.body,
+                                        "  {} = or i64 {}, {}",
+                                        packed, shifted, masked
+                                    );
+                                    return (packed, VarKind::Enum);
+                                }
+                            }
+                        }
+                    }
                     let (obj_val, obj_kind) = self.emit_expr(object);
                     if obj_kind != VarKind::Struct {
                         self.errors
@@ -806,6 +918,24 @@ impl Codegen {
                 ("0".into(), VarKind::Number)
             }
             Expr::Field { object, field } => {
+                // Unit enum variant: Color.Red → (tag << 32)
+                if let Expr::Ident(enum_name) = object.as_ref() {
+                    if let Some(variants) = self.enums.get(enum_name).cloned() {
+                        if let Some((idx, (_, nfields))) =
+                            variants.iter().enumerate().find(|(_, (v, _))| v == field)
+                        {
+                            if *nfields == 0 {
+                                let packed = self.fresh();
+                                let _ = writeln!(
+                                    self.body,
+                                    "  {} = shl i64 {}, 32",
+                                    packed, idx
+                                );
+                                return (packed, VarKind::Enum);
+                            }
+                        }
+                    }
+                }
                 let (obj, kind) = self.emit_expr(object);
                 if field == "length" && kind == VarKind::List {
                     let loaded = self.fresh();
@@ -884,7 +1014,7 @@ impl Codegen {
         match kind {
             VarKind::String => val,
             VarKind::Struct | VarKind::List => val,
-            VarKind::Number => {
+            VarKind::Number | VarKind::Enum => {
                 let buf = self.fresh();
                 let _ = writeln!(self.body, "  {} = call ptr @malloc(i64 32)", buf);
                 let g = self.intern_string("%lld");

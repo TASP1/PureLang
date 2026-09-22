@@ -34,8 +34,8 @@
 - [x] Lists (literal, length, indexing, for-in)
 - [x] Methods on structs (`fn Point.distance(self)`)
 - [ ] Full ownership & borrow checker
-- [ ] Enums
-- [ ] Pattern matching
+- [x] Enums + match (`enum Color { Red Green }` + `match c { Color.Red => ... }`)
+
 - [ ] Generics / traits
 - [ ] Error handling with `?`
 - [ ] Modules and visibility

@@ -137,6 +137,9 @@ impl Lexer {
                 if self.peek() == Some('=') {
                     self.advance();
                     Token::Equal
+                } else if self.peek() == Some('>') {
+                    self.advance();
+                    Token::FatArrow
                 } else {
                     Token::Assign
                 }

@@ -29,7 +29,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.8.1 (PureLang — lexer + parser + typecheck + llvm + wasm)");
+        println!("purec 0.8.2 (PureLang — lexer + parser + typecheck + llvm + wasm)");
         return;
     }
 
@@ -312,6 +312,21 @@ fn print_item(item: &Item, level: usize) {
                 println!("{}Field {}", indent(level + 1), f);
             }
         }
+        Item::Enum { name, variants } => {
+            println!("{}Enum {}", indent(level), name);
+            for v in variants {
+                if v.fields.is_empty() {
+                    println!("{}Variant {}", indent(level + 1), v.name);
+                } else {
+                    println!(
+                        "{}Variant {}({})",
+                        indent(level + 1),
+                        v.name,
+                        v.fields.join(", ")
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -366,6 +381,33 @@ fn print_stmt(stmt: &Stmt, level: usize) {
         Stmt::Return(Some(e)) => {
             println!("{}Return", indent(level));
             print_expr(e, level + 1);
+        }
+        Stmt::Match { expr, arms } => {
+            println!("{}Match", indent(level));
+            print_expr(expr, level + 1);
+            for arm in arms {
+                match &arm.pattern {
+                    Pattern::Variant {
+                        enum_name,
+                        variant,
+                        binding,
+                    } => {
+                        if let Some(b) = binding {
+                            println!(
+                                "{}Arm {}.{}({})",
+                                indent(level + 1),
+                                enum_name,
+                                variant,
+                                b
+                            );
+                        } else {
+                            println!("{}Arm {}.{}", indent(level + 1), enum_name, variant);
+                        }
+                    }
+                    Pattern::Wildcard => println!("{}Arm _", indent(level + 1)),
+                }
+                print_block(&arm.body, level + 2);
+            }
         }
         Stmt::Expr(e) => {
             println!("{}ExprStmt", indent(level));

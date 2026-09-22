@@ -77,8 +77,12 @@ impl Parser {
         match self.peek() {
             Token::Fn => self.parse_function(),
             Token::Struct => self.parse_struct(),
+            Token::Enum => self.parse_enum(),
             other => Err(ParseError {
-                message: format!("Expected top-level item (fn or struct), found {:?}", other),
+                message: format!(
+                    "Expected top-level item (fn, struct, or enum), found {:?}",
+                    other
+                ),
             }),
         }
     }
@@ -134,6 +138,42 @@ impl Parser {
         Ok(Item::Struct { name, fields })
     }
 
+    fn parse_enum(&mut self) -> Result<Item, ParseError> {
+        self.expect(Token::Enum)?;
+        let name = self.expect_ident()?;
+        self.expect(Token::LBrace)?;
+
+        let mut variants = Vec::new();
+        while !matches!(self.peek(), Token::RBrace) {
+            let vname = self.expect_ident()?;
+            let mut fields = Vec::new();
+            // Optional payload: Variant(field) or Variant(a, b)
+            if matches!(self.peek(), Token::LParen) {
+                self.advance();
+                if !matches!(self.peek(), Token::RParen) {
+                    loop {
+                        fields.push(self.expect_ident()?);
+                        if matches!(self.peek(), Token::Comma) {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                self.expect(Token::RParen)?;
+            }
+            variants.push(EnumVariant {
+                name: vname,
+                fields,
+            });
+            if matches!(self.peek(), Token::Comma) {
+                self.advance();
+            }
+        }
+        self.expect(Token::RBrace)?;
+        Ok(Item::Enum { name, variants })
+    }
+
     fn parse_block(&mut self) -> Result<Block, ParseError> {
         self.expect(Token::LBrace)?;
         let mut statements = Vec::new();
@@ -155,6 +195,7 @@ impl Parser {
             }
             Token::If => self.parse_if(),
             Token::For => self.parse_for(),
+            Token::Match => self.parse_match(),
             Token::Return => {
                 self.advance();
                 // optional expression
@@ -237,6 +278,51 @@ impl Parser {
             iterable,
             body,
         })
+    }
+
+    fn parse_match(&mut self) -> Result<Stmt, ParseError> {
+        self.expect(Token::Match)?;
+        let expr = self.parse_expr()?;
+        self.expect(Token::LBrace)?;
+        let mut arms = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            // Pattern: Enum.Variant or Enum.Variant(bind)
+            let enum_name = self.expect_ident()?;
+            self.expect(Token::Dot)?;
+            let variant = self.expect_ident()?;
+            let binding = if matches!(self.peek(), Token::LParen) {
+                self.advance();
+                let b = self.expect_ident()?;
+                self.expect(Token::RParen)?;
+                Some(b)
+            } else {
+                None
+            };
+            self.expect(Token::FatArrow)?;
+            // Body can be a block `{ ... }` or a single statement expression treated as block
+            let body = if matches!(self.peek(), Token::LBrace) {
+                self.parse_block()?
+            } else {
+                // single expression / print / return as a one-statement block
+                let stmt = self.parse_stmt()?;
+                Block {
+                    statements: vec![stmt],
+                }
+            };
+            arms.push(MatchArm {
+                pattern: Pattern::Variant {
+                    enum_name,
+                    variant,
+                    binding,
+                },
+                body,
+            });
+            if matches!(self.peek(), Token::Comma) {
+                self.advance();
+            }
+        }
+        self.expect(Token::RBrace)?;
+        Ok(Stmt::Match { expr, arms })
     }
 
     // ---------- Expressions (Pratt-style precedence) ----------

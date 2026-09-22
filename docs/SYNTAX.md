@@ -150,3 +150,35 @@ fn main() {
 ```
 
 Define methods with `fn TypeName.method(self, ...)`. Call them with `obj.method(args)`.
+
+### Enums and match
+
+```pure
+enum Color {
+    Red
+    Green
+    Blue
+}
+
+enum Option {
+    Some(value)
+    None
+}
+
+fn main() {
+    c = Color.Red
+    match c {
+        Color.Red => print "red"
+        Color.Green => print "green"
+        Color.Blue => print "blue"
+    }
+
+    o = Option.Some(42)
+    match o {
+        Option.Some(v) => print v
+        Option.None => print "none"
+    }
+}
+```
+
+Unit variants and single-Number payload variants are supported. Match arms use `Enum.Variant => body` or `Enum.Variant(binding) => body`.

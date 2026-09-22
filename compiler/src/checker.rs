@@ -26,6 +26,8 @@ pub struct TypeChecker {
     methods: HashMap<(String, String), Type>,
     /// Struct name → field names (order matters)
     structs: HashMap<String, Vec<String>>,
+    /// Enum name → list of (variant name, payload field count)
+    enums: HashMap<String, Vec<(String, usize)>>,
     errors: Vec<TypeError>,
 }
 
@@ -38,16 +40,24 @@ impl TypeChecker {
             functions: HashMap::new(),
             methods: HashMap::new(),
             structs: HashMap::new(),
+            enums: HashMap::new(),
             errors: Vec::new(),
         }
     }
 
     pub fn check_program(&mut self, program: &Program) -> Result<(), Vec<TypeError>> {
-        // First pass: register structs and function signatures
+        // First pass: register structs, enums and function signatures
         for item in &program.items {
             match item {
                 Item::Struct { name, fields } => {
                     self.structs.insert(name.clone(), fields.clone());
+                }
+                Item::Enum { name, variants } => {
+                    let vs: Vec<(String, usize)> = variants
+                        .iter()
+                        .map(|v| (v.name.clone(), v.fields.len()))
+                        .collect();
+                    self.enums.insert(name.clone(), vs);
                 }
                 Item::Function {
                     receiver,
@@ -234,6 +244,9 @@ impl TypeChecker {
             Item::Struct { .. } => {
                 // Struct declarations are fine for now; no body to check
             }
+            Item::Enum { .. } => {
+                // Enum declarations are fine for now; no body to check
+            }
         }
     }
 
@@ -366,6 +379,64 @@ impl TypeChecker {
                     let _ = self.check_expr(expr);
                 }
             }
+            Stmt::Match { expr, arms } => {
+                let expr_ty = self.check_expr(expr);
+                for arm in arms {
+                    self.push_scope();
+                    match &arm.pattern {
+                        Pattern::Variant {
+                            enum_name,
+                            variant,
+                            binding,
+                        } => {
+                            if let Type::Enum(en) = &expr_ty {
+                                if en != enum_name {
+                                    self.error(format!(
+                                        "Match arm pattern type '{}' does not match expression type '{}'",
+                                        enum_name, en
+                                    ));
+                                }
+                            } else if expr_ty != Type::Unknown {
+                                self.error(format!(
+                                    "Cannot match on non-enum type {}",
+                                    expr_ty
+                                ));
+                            }
+                            if let Some(variants) = self.enums.get(enum_name) {
+                                if let Some((_, nfields)) =
+                                    variants.iter().find(|(v, _)| v == variant)
+                                {
+                                    if let Some(b) = binding {
+                                        if *nfields == 0 {
+                                            self.error(format!(
+                                                "Variant '{}.{}' has no payload to bind",
+                                                enum_name, variant
+                                            ));
+                                        } else {
+                                            // MVP: payload is Number
+                                            self.declare(b, Type::Number, false);
+                                        }
+                                    } else if *nfields > 0 {
+                                        // allow ignoring payload
+                                    }
+                                } else {
+                                    self.error(format!(
+                                        "Unknown variant '{}.{}'",
+                                        enum_name, variant
+                                    ));
+                                }
+                            } else {
+                                self.error(format!("Unknown enum '{}'", enum_name));
+                            }
+                        }
+                        Pattern::Wildcard => {}
+                    }
+                    for stmt in &arm.body.statements {
+                        self.check_stmt(stmt);
+                    }
+                    self.pop_scope();
+                }
+            }
             Stmt::Expr(expr) => {
                 let _ = self.check_expr(expr);
             }
@@ -409,6 +480,28 @@ impl TypeChecker {
                 Type::List(Box::new(first))
             }
             Expr::Field { object, field } => {
+                // Enum unit variant construction: Color.Red  (object is Ident of enum name)
+                if let Expr::Ident(enum_name) = object.as_ref() {
+                    if let Some(variants) = self.enums.get(enum_name) {
+                        if let Some((_, nfields)) = variants.iter().find(|(v, _)| v == field) {
+                            if *nfields == 0 {
+                                return Type::Enum(enum_name.clone());
+                            } else {
+                                self.error(format!(
+                                    "Variant '{}.{}' expects {} payload argument(s); use {}.{}(...)",
+                                    enum_name, field, nfields, enum_name, field
+                                ));
+                                return Type::Unknown;
+                            }
+                        } else {
+                            self.error(format!(
+                                "Enum '{}' has no variant '{}'",
+                                enum_name, field
+                            ));
+                            return Type::Unknown;
+                        }
+                    }
+                }
                 let obj_ty = self.check_expr(object);
                 match &obj_ty {
                     Type::String if field == "length" => Type::Number,
@@ -555,6 +648,35 @@ impl TypeChecker {
     }
 
     fn check_call(&mut self, callee: &Expr, args: &[Expr]) -> Type {
+        // Enum variant with payload: Option.Some(42)
+        if let Expr::Field { object, field } = callee {
+            if let Expr::Ident(enum_name) = object.as_ref() {
+                if let Some(variants) = self.enums.get(enum_name).cloned() {
+                    if let Some((_, nfields)) = variants.iter().find(|(v, _)| v == field) {
+                        if args.len() != *nfields {
+                            self.error(format!(
+                                "Variant '{}.{}' expects {} argument(s), found {}",
+                                enum_name,
+                                field,
+                                nfields,
+                                args.len()
+                            ));
+                        }
+                        for a in args {
+                            let t = self.check_expr(a);
+                            if t != Type::Number && t != Type::Unknown {
+                                self.error(format!(
+                                    "Enum payload must be Number for now, found {}",
+                                    t
+                                ));
+                            }
+                        }
+                        return Type::Enum(enum_name.clone());
+                    }
+                }
+            }
+        }
+
         // Struct construction: Point(10, 20)
         if let Expr::Ident(name) = callee
             && let Some(fields) = self.structs.get(name).cloned()
