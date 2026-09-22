@@ -31,7 +31,7 @@
 
 - [x] User-defined functions + calls + return values
 - [x] Structs (declaration, construction, field access)
-- [x] Lists (literal, length, indexing)
+- [x] Lists (literal, length, indexing, for-in)
 - [ ] Full ownership & borrow checker
 - [ ] Methods, enums
 - [ ] Pattern matching

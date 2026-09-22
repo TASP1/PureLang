@@ -1,0 +1,11 @@
+// for-in over list
+
+fn main() {
+    nums = [1, 2, 3, 4, 5]
+    mut total = 0
+    for n in nums {
+        total = total + n
+        print n
+    }
+    print total
+}

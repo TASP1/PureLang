@@ -325,8 +325,60 @@ impl Codegen {
                     let _ = writeln!(self.body, "  br label %{}", loop_cond);
                     let _ = writeln!(self.body, "{}:", loop_end);
                 } else {
-                    self.errors
-                        .push("codegen: only range for-loops supported".into());
+                    // for x in list { ... } — iterate by index
+                    let (list_ptr, lkind) = self.emit_expr(iterable);
+                    if lkind != VarKind::List {
+                        self.errors
+                            .push("codegen: for-loop expects Range or List".into());
+                    }
+                    let len = self.fresh();
+                    let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", len, list_ptr);
+                    let idx = format!("%idx.{}", var);
+                    let _ = writeln!(self.body, "  {} = alloca i64, align 8", idx);
+                    let _ = writeln!(self.body, "  store i64 0, ptr {}, align 8", idx);
+
+                    let vptr = format!("%{}.addr", var);
+                    let _ = writeln!(self.body, "  {} = alloca i64, align 8", vptr);
+                    self.vars
+                        .insert(var.clone(), (vptr.clone(), VarKind::Number));
+
+                    let loop_cond = self.fresh_label("forlist.cond");
+                    let loop_body = self.fresh_label("forlist.body");
+                    let loop_end = self.fresh_label("forlist.end");
+                    let _ = writeln!(self.body, "  br label %{}", loop_cond);
+                    let _ = writeln!(self.body, "{}:", loop_cond);
+                    let cur = self.fresh();
+                    let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", cur, idx);
+                    let cmp = self.fresh();
+                    let _ = writeln!(self.body, "  {} = icmp slt i64 {}, {}", cmp, cur, len);
+                    let _ = writeln!(
+                        self.body,
+                        "  br i1 {}, label %{}, label %{}",
+                        cmp, loop_body, loop_end
+                    );
+                    let _ = writeln!(self.body, "{}:", loop_body);
+                    // load element list[cur]
+                    let off = self.fresh();
+                    let _ = writeln!(self.body, "  {} = add i64 {}, 1", off, cur);
+                    let ep = self.fresh();
+                    let _ = writeln!(
+                        self.body,
+                        "  {} = getelementptr inbounds i64, ptr {}, i64 {}",
+                        ep, list_ptr, off
+                    );
+                    let elem = self.fresh();
+                    let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", elem, ep);
+                    let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", elem, vptr);
+
+                    self.emit_block(body);
+
+                    let cur2 = self.fresh();
+                    let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", cur2, idx);
+                    let next = self.fresh();
+                    let _ = writeln!(self.body, "  {} = add i64 {}, 1", next, cur2);
+                    let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", next, idx);
+                    let _ = writeln!(self.body, "  br label %{}", loop_cond);
+                    let _ = writeln!(self.body, "{}:", loop_end);
                 }
             }
             Stmt::Return(None) => {

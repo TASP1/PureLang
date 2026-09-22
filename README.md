@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.7.0**
+**Compiler:** `purec` **v0.8.0**
 
 ## Quick Example
 
@@ -45,7 +45,7 @@ fn main() {
 - [x] **WebAssembly** (WASI `.wat`)
 - [x] **Functions** (define, call, return)
 - [x] **Structs** (declare, construct, fields)
-- [x] **Lists** (literal, `.length`, indexing `list[i]`)
+- [x] **Lists** (literal, `.length`, indexing, `for x in list`)
 - [x] CI on **public** GitHub Actions (free unlimited minutes)
 
 ### Next
@@ -75,6 +75,7 @@ cargo run --release -- --compile -o hello ../examples/hello.pure
 cargo run --release -- --compile -o funcs ../examples/funcs.pure && ./funcs
 cargo run --release -- --compile -o structs ../examples/structs.pure && ./structs
 cargo run --release -- --compile -o lists ../examples/lists.pure && ./lists
+cargo run --release -- --compile -o list_loop ../examples/list_loop.pure && ./list_loop
 
 # WebAssembly
 cargo run --release -- --emit-wasm ../examples/hello.pure
@@ -104,7 +105,8 @@ PureLang/
 │   ├── game_loop.pure
 │   ├── funcs.pure
 │   ├── structs.pure
-│   └── lists.pure
+│   ├── lists.pure
+│   └── list_loop.pure
 └── .github/workflows/ci.yml
 ```
 
