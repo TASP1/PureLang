@@ -7,7 +7,7 @@
 - [x] **Lexer implemented**
 - [x] **Parser + AST implemented**
 - [x] **Type checker + Ownership analysis**
-- [ ] LLVM IR code generation
+- [x] **LLVM IR code generation**
 - [ ] WebAssembly backend
 - [ ] Standard library
 
@@ -19,8 +19,8 @@
 - [x] Parser → Abstract Syntax Tree (AST)
 - [x] Basic type checking
 - [x] Simple ownership tracking
-- [ ] LLVM IR emission for a tiny subset
-- [ ] First native executable (`purec hello.pure -o hello`)
+- [x] LLVM IR emission for a tiny subset
+- [x] First native executable (`purec --compile -o hello hello.pure`)
 - [ ] First WebAssembly module
 
 **Milestone**: Hello World + simple game loop running natively.

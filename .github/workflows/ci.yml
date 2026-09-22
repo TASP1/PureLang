@@ -7,7 +7,6 @@ on:
     branches: [ master, main ]
   workflow_dispatch:
 
-# Always use the newest GitHub-hosted environment
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -15,14 +14,13 @@ env:
 jobs:
   docs:
     name: Check Documentation
-    runs-on: ubuntu-latest   # tracks newest Ubuntu (currently 24.04 → 26.04 soon)
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
       - name: Check Markdown files exist
         run: |
-          echo "Verifying core documentation..."
           test -f README.md
           test -f docs/ARCHITECTURE.md
           test -f docs/MEMORY_MODEL.md
@@ -31,16 +29,10 @@ jobs:
           test -f docs/ROADMAP.md
           test -f LICENSE
           test -f CONTRIBUTING.md
-          echo "All core documentation files are present."
-
-      - name: List project structure
-        run: |
-          echo "Project structure:"
-          find . -type f -not -path './.git/*' | sort
 
   build:
     name: Build Compiler (purec)
-    runs-on: ubuntu-latest   # always latest stable GitHub runner image
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: compiler
@@ -52,22 +44,20 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          # Explicitly request the absolute latest stable channel
+
+      - name: Install clang (for native codegen)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang
 
       - name: Show toolchain versions
         run: |
           rustc --version --verbose
           cargo --version
-          rustfmt --version
-          clippy-driver --version
-          echo "Runner OS: $RUNNER_OS"
-          echo "Image OS: $(cat /etc/os-release | grep PRETTY_NAME)"
+          clang --version | head -1
 
       - name: Cache cargo registry & build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: compiler
-          # Keep cache keys current with latest toolchain
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -78,13 +68,19 @@ jobs:
       - name: Build (release)
         run: cargo build --release
 
-      - name: Run lexer on examples
+      - name: Type-check examples
         run: |
-          echo "=== hello.pure ==="
           cargo run --release -- ../examples/hello.pure
-          echo ""
-          echo "=== game_loop.pure ==="
           cargo run --release -- ../examples/game_loop.pure
+
+      - name: Compile examples to native
+        run: |
+          cargo run --release -- --compile -o /tmp/hello_pure ../examples/hello.pure
+          cargo run --release -- --compile -o /tmp/game_loop ../examples/game_loop.pure
+          echo "=== hello_pure ==="
+          /tmp/hello_pure
+          echo "=== game_loop ==="
+          /tmp/game_loop
 
       - name: Upload purec binary
         uses: actions/upload-artifact@v7

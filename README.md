@@ -35,8 +35,8 @@ fn main() {
 - [x] Public repository & design documents
 - [x] **Lexer complete**
 - [x] **Parser + AST complete**
-- [x] **Type & Ownership checker** (Phase 1)
-- [ ] LLVM code generation
+- [x] **Type & Ownership checker**
+- [x] **LLVM code generation** (native binaries!)
 - [ ] WebAssembly target
 
 ## Project Structure
@@ -51,7 +51,8 @@ PureLang/
 │       ├── ast.rs
 │       ├── parser.rs
 │       ├── types.rs
-│       └── checker.rs
+│       ├── checker.rs
+│       └── codegen.rs
 ├── docs/               # Full design documentation
 │   ├── ARCHITECTURE.md
 │   ├── SYNTAX.md
@@ -65,19 +66,24 @@ PureLang/
 └── CONTRIBUTING.md
 ```
 
-## Try the Type Checker
+## Try it
 
 ```bash
 cd compiler
 cargo build --release
+
+# Type-check
 cargo run --release -- ../examples/hello.pure
-cargo run --release -- ../examples/game_loop.pure
 
-# AST only (skip type check):
-cargo run --release -- --ast ../examples/hello.pure
+# Compile to native binary (requires clang)
+cargo run --release -- --compile -o hello ../examples/hello.pure
+./hello
 
-# Tokens only:
-cargo run --release -- --tokens ../examples/hello.pure
+cargo run --release -- --compile -o game ../examples/game_loop.pure
+./game
+
+# Emit LLVM IR only
+cargo run --release -- --emit-ir ../examples/hello.pure
 ```
 
 ## Documentation

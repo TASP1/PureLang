@@ -1,7 +1,8 @@
-//! PureLang Compiler (purec) - Phase 1: Lexer + Parser + Type Checker
+//! PureLang Compiler (purec) - Lexer + Parser + Type Checker + LLVM Codegen
 
 mod ast;
 mod checker;
+mod codegen;
 mod lexer;
 mod parser;
 mod token;
@@ -9,10 +10,12 @@ mod types;
 
 use std::env;
 use std::fs;
-use std::process;
+use std::path::Path;
+use std::process::{self, Command};
 
 use ast::*;
 use checker::TypeChecker;
+use codegen::Codegen;
 use lexer::Lexer;
 use parser::Parser;
 
@@ -20,40 +23,77 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("PureLang Compiler (purec) v0.3.0");
-        eprintln!();
-        eprintln!("Usage:");
-        eprintln!("  purec <file.pure>          Parse + type-check a PureLang source file");
-        eprintln!("  purec --tokens <file>      Show tokens only");
-        eprintln!("  purec --ast <file>         Show AST only (skip type check)");
-        eprintln!("  purec --version            Show version");
-        eprintln!();
-        eprintln!("Example:");
-        eprintln!("  purec examples/hello.pure");
+        print_usage();
         process::exit(1);
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.3.0 (PureLang compiler - lexer + parser + type checker)");
+        println!("purec 0.4.0 (PureLang compiler - lexer + parser + typecheck + llvm)");
         return;
     }
 
-    let (mode, filename) = match args[1].as_str() {
-        "--tokens" => {
-            if args.len() < 3 {
-                eprintln!("Error: --tokens requires a file path");
+    let mut mode = "check";
+    let mut filename: Option<&str> = None;
+    let mut output: Option<&str> = None;
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--tokens" => {
+                mode = "tokens";
+                i += 1;
+                if i < args.len() {
+                    filename = Some(&args[i]);
+                }
+            }
+            "--ast" => {
+                mode = "ast";
+                i += 1;
+                if i < args.len() {
+                    filename = Some(&args[i]);
+                }
+            }
+            "--emit-ir" => {
+                mode = "ir";
+                i += 1;
+                if i < args.len() && !args[i].starts_with('-') {
+                    filename = Some(&args[i]);
+                }
+            }
+            "-o" | "--output" => {
+                i += 1;
+                if i < args.len() {
+                    output = Some(&args[i]);
+                }
+            }
+            "--compile" | "-c" => {
+                mode = "compile";
+            }
+            s if s.starts_with('-') => {
+                eprintln!("Unknown option: {}", s);
                 process::exit(1);
             }
-            ("tokens", &args[2])
-        }
-        "--ast" => {
-            if args.len() < 3 {
-                eprintln!("Error: --ast requires a file path");
-                process::exit(1);
+            s => {
+                filename = Some(s);
+                if mode == "check" {
+                    // default stays check unless -c/--compile
+                }
             }
-            ("ast", &args[2])
         }
-        _ => ("check", &args[1]),
+        i += 1;
+    }
+
+    // If -o given without explicit mode, compile
+    if output.is_some() && mode == "check" {
+        mode = "compile";
+    }
+
+    let filename = match filename {
+        Some(f) => f,
+        None => {
+            eprintln!("Error: no input file");
+            print_usage();
+            process::exit(1);
+        }
     };
 
     let source = match fs::read_to_string(filename) {
@@ -64,14 +104,11 @@ fn main() {
         }
     };
 
-    // Lex
     let mut lexer = Lexer::new(&source);
     let tokens = lexer.tokenize();
 
     if mode == "tokens" {
         println!("=== PureLang Tokens ===");
-        println!("File: {}", filename);
-        println!("----------------------");
         for (i, token) in tokens.iter().enumerate() {
             if matches!(token, token::Token::Eof) {
                 println!("{:3}: EOF", i);
@@ -79,12 +116,9 @@ fn main() {
                 println!("{:3}: {:?}", i, token);
             }
         }
-        println!("----------------------");
-        println!("Total tokens: {}", tokens.len());
         return;
     }
 
-    // Parse
     let mut parser = Parser::new(tokens);
     let program = match parser.parse_program() {
         Ok(p) => p,
@@ -96,38 +130,103 @@ fn main() {
 
     if mode == "ast" {
         println!("=== PureLang AST ===");
-        println!("File: {}", filename);
-        println!("----------------------");
         print_program(&program, 0);
-        println!("----------------------");
-        println!("Parse successful ✓");
         return;
     }
 
     // Type check
-    println!("=== PureLang Type Checker ===");
-    println!("File: {}", filename);
-    println!("----------------------");
-
     let mut checker = TypeChecker::new();
-    match checker.check_program(&program) {
-        Ok(()) => {
-            println!("Type check passed ✓");
-            println!("----------------------");
-            println!("No type or ownership errors.");
+    if let Err(errors) = checker.check_program(&program) {
+        for err in &errors {
+            eprintln!("{}", err);
         }
+        eprintln!("{} error(s) found", errors.len());
+        process::exit(1);
+    }
+
+    if mode == "check" {
+        println!("=== PureLang Type Checker ===");
+        println!("File: {}", filename);
+        println!("Type check passed ✓");
+        return;
+    }
+
+    // Codegen
+    let mut cg = Codegen::new();
+    let ir = match cg.generate(&program) {
+        Ok(ir) => ir,
         Err(errors) => {
-            for err in &errors {
-                eprintln!("{}", err);
+            for e in errors {
+                eprintln!("Codegen error: {}", e);
             }
-            eprintln!("----------------------");
-            eprintln!("{} error(s) found", errors.len());
+            process::exit(1);
+        }
+    };
+
+    if mode == "ir" {
+        if let Some(out) = output {
+            fs::write(out, &ir).unwrap_or_else(|e| {
+                eprintln!("Failed to write {}: {}", out, e);
+                process::exit(1);
+            });
+            println!("Wrote LLVM IR to {}", out);
+        } else {
+            print!("{}", ir);
+        }
+        return;
+    }
+
+    // mode == compile
+    let base = Path::new(filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("out");
+    let ir_path = format!("{}.ll", base);
+    let bin_path = output.unwrap_or(base).to_string();
+
+    fs::write(&ir_path, &ir).unwrap_or_else(|e| {
+        eprintln!("Failed to write {}: {}", ir_path, e);
+        process::exit(1);
+    });
+
+    // Compile IR with clang
+    let status = Command::new("clang")
+        .args(["-O2", "-o", &bin_path, &ir_path])
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {
+            println!("=== PureLang Compiler ===");
+            println!("File: {}", filename);
+            println!("Type check passed ✓");
+            println!("LLVM IR → {}", ir_path);
+            println!("Native binary → {}", bin_path);
+            println!("Compile successful ✓");
+        }
+        Ok(s) => {
+            eprintln!("clang failed with status {}", s);
+            process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("Failed to run clang: {}", e);
+            eprintln!("Install clang/LLVM, or use --emit-ir to only generate IR.");
             process::exit(1);
         }
     }
 }
 
-// ---------- Pretty printer (used by --ast) ----------
+fn print_usage() {
+    eprintln!("PureLang Compiler (purec) v0.4.0");
+    eprintln!();
+    eprintln!("Usage:");
+    eprintln!("  purec <file.pure>              Type-check");
+    eprintln!("  purec --compile <file.pure>    Compile to native binary");
+    eprintln!("  purec -o <out> <file.pure>     Compile to named binary");
+    eprintln!("  purec --emit-ir <file.pure>    Print LLVM IR");
+    eprintln!("  purec --ast <file.pure>        Show AST");
+    eprintln!("  purec --tokens <file.pure>     Show tokens");
+    eprintln!("  purec --version");
+}
 
 fn indent(level: usize) -> String {
     "  ".repeat(level)
@@ -143,8 +242,7 @@ fn print_program(program: &Program, level: usize) {
 fn print_item(item: &Item, level: usize) {
     match item {
         Item::Function { name, params, body } => {
-            let params_str = params.join(", ");
-            println!("{}Fn {}({})", indent(level), name, params_str);
+            println!("{}Fn {}({})", indent(level), name, params.join(", "));
             print_block(body, level + 1);
         }
         Item::Struct { name, fields } => {
@@ -170,8 +268,8 @@ fn print_stmt(stmt: &Stmt, level: usize) {
             name,
             value,
         } => {
-            let mut_str = if *mutable { "mut " } else { "" };
-            println!("{}Let {}{}", indent(level), mut_str, name);
+            let m = if *mutable { "mut " } else { "" };
+            println!("{}Let {}{}", indent(level), m, name);
             print_expr(value, level + 1);
         }
         Stmt::Assign { name, value } => {
@@ -189,11 +287,9 @@ fn print_stmt(stmt: &Stmt, level: usize) {
         } => {
             println!("{}If", indent(level));
             print_expr(condition, level + 1);
-            println!("{}Then", indent(level + 1));
-            print_block(then_block, level + 2);
-            if let Some(else_b) = else_block {
-                println!("{}Else", indent(level + 1));
-                print_block(else_b, level + 2);
+            print_block(then_block, level + 1);
+            if let Some(e) = else_block {
+                print_block(e, level + 1);
             }
         }
         Stmt::For {
@@ -206,13 +302,13 @@ fn print_stmt(stmt: &Stmt, level: usize) {
             print_block(body, level + 1);
         }
         Stmt::Return(None) => println!("{}Return", indent(level)),
-        Stmt::Return(Some(expr)) => {
+        Stmt::Return(Some(e)) => {
             println!("{}Return", indent(level));
-            print_expr(expr, level + 1);
+            print_expr(e, level + 1);
         }
-        Stmt::Expr(expr) => {
+        Stmt::Expr(e) => {
             println!("{}ExprStmt", indent(level));
-            print_expr(expr, level + 1);
+            print_expr(e, level + 1);
         }
     }
 }
@@ -222,7 +318,7 @@ fn print_expr(expr: &Expr, level: usize) {
         Expr::Number(n) => println!("{}Number({})", indent(level), n),
         Expr::String(s) => println!("{}String(\"{}\")", indent(level), s),
         Expr::Bool(b) => println!("{}Bool({})", indent(level), b),
-        Expr::Ident(name) => println!("{}Ident({})", indent(level), name),
+        Expr::Ident(n) => println!("{}Ident({})", indent(level), n),
         Expr::Binary { left, op, right } => {
             println!("{}Binary({})", indent(level), op);
             print_expr(left, level + 1);
@@ -235,8 +331,8 @@ fn print_expr(expr: &Expr, level: usize) {
         Expr::Call { callee, args } => {
             println!("{}Call", indent(level));
             print_expr(callee, level + 1);
-            for arg in args {
-                print_expr(arg, level + 1);
+            for a in args {
+                print_expr(a, level + 1);
             }
         }
         Expr::Range { start, end } => {
@@ -244,9 +340,9 @@ fn print_expr(expr: &Expr, level: usize) {
             print_expr(start, level + 1);
             print_expr(end, level + 1);
         }
-        Expr::List(elements) => {
+        Expr::List(els) => {
             println!("{}List", indent(level));
-            for e in elements {
+            for e in els {
                 print_expr(e, level + 1);
             }
         }
