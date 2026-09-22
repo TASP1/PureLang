@@ -1,21 +1,13 @@
 # PureLang
 
-**PureLang** is a next-generation systems programming language designed for **ultra-native speed**, **absolute memory safety**, and a syntax that is **far easier than Python**.
+**PureLang** is a modern systems programming language designed for:
 
-It is built for:
-- Games and game engines
-- 3D software
-- AI / high-performance computing
-- Desktop, mobile, web, and **native console** applications
+- **Ultra-native performance** (games, engines, 3D, AI)
+- **Absolute memory safety** without a garbage collector
+- **Syntax far easier than Python**
+- Native execution on desktop, mobile, web, and consoles
 
-## 🎯 Goals
-
-- Native performance on all platforms (Windows, macOS, Linux, iOS, Android, consoles)
-- Compile-time memory safety (ownership model, no garbage collector)
-- Syntax that is significantly easier and cleaner than Python
-- Compiles to LLVM IR (native) + WebAssembly (web)
-
-## ✨ Easy Syntax Example
+## Quick Example
 
 ```pure
 fn main() {
@@ -38,50 +30,58 @@ fn main() {
 }
 ```
 
-## 📁 Project Structure
+## Current Status
+
+- [x] Public repository & design documents
+- [x] **Lexer complete** (Phase 1)
+- [ ] Parser + AST
+- [ ] Type & Ownership checker
+- [ ] LLVM code generation
+- [ ] WebAssembly target
+
+## Project Structure
 
 ```
 PureLang/
-├── compiler/              # The PureLang compiler (purec) written in Rust
+├── compiler/           # purec compiler (Rust)
 │   └── src/
 │       ├── main.rs
 │       ├── lexer.rs
 │       └── token.rs
-├── docs/                  # Design documents
-├── examples/              # Sample .pure programs
-├── .github/workflows/     # CI
+├── docs/               # Full design documentation
+│   ├── ARCHITECTURE.md
+│   ├── SYNTAX.md
+│   ├── MEMORY_MODEL.md
+│   ├── COMPILER.md
+│   └── ROADMAP.md
+├── examples/           # .pure example programs
+├── .github/workflows/  # CI
 ├── README.md
 ├── LICENSE
 └── CONTRIBUTING.md
 ```
 
-## 🚀 Current Status
-
-- [x] Project initialized
-- [x] Core design documents
-- [x] **Lexer implemented** (Phase 1)
-- [ ] Parser + AST
-- [ ] Type checker + Ownership
-- [ ] LLVM IR code generation
-- [ ] WebAssembly target
-- [ ] Standard library
-
-### Try the Lexer right now
+## Try the Lexer
 
 ```bash
 cd compiler
 cargo build
-./target/debug/purec ../examples/hello.pure
+cargo run -- ../examples/hello.pure
+cargo run -- ../examples/game_loop.pure
 ```
 
-## 📖 Documentation
+## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Syntax (Easy Mode)](docs/SYNTAX.md)
 - [Memory Model](docs/MEMORY_MODEL.md)
-- [Syntax Design](docs/SYNTAX.md)
 - [Compiler Design](docs/COMPILER.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## License
 
 MIT License
+
+---
+
+**PureLang** — Native speed. Absolute safety. Easier than Python.

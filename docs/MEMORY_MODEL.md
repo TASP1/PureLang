@@ -2,68 +2,64 @@
 
 ## Goal
 
-Deliver **complete memory safety** (no use-after-free, no double-free, no data races, no buffer overflows in safe code) **with zero runtime overhead**.
+Deliver complete memory safety (no use-after-free, no double-free, no data races) with **zero runtime overhead** and **almost invisible syntax**.
 
-This is achieved through **compile-time ownership and borrowing**, inspired by Rust, with design choices aimed at reducing annotation burden while preserving safety.
+## Core Rules
 
-## Core Concepts
+1. Every value has exactly one owner at a time.
+2. When the owner goes out of scope, the value is automatically destroyed.
+3. Values can be borrowed temporarily (immutably or mutably) under strict rules.
+4. The compiler enforces all rules at compile time.
 
-### 1. Ownership
+## Design Choice: Ownership is Mostly Invisible
 
-Every value has exactly one owner at any time.
+Unlike classic Rust, PureLang aims to make ownership feel automatic for everyday code.
 
-- When the owner goes out of scope, the value is automatically dropped (destructor runs).
-- Ownership can be **moved** (transferred) to another variable or function.
-- Ownership can be **borrowed** temporarily.
-
-### 2. Borrowing
-
-- **Immutable borrow** (`&T` or `read T`): Multiple simultaneous immutable references are allowed. No mutation while borrowed.
-- **Mutable borrow** (`&mut T` or `mut T`): Exactly one mutable reference is allowed at a time. No other borrows can exist.
-
-### 3. Lifetimes
-
-The compiler tracks how long each reference is valid. Most lifetimes are inferred; explicit annotations are only required in complex cases (similar to modern Rust).
-
-### Design Goals vs Pure Rust
-
-| Aspect                  | PureLang Goal                          | Notes |
-|-------------------------|----------------------------------------|-------|
-| Safety                  | Same as Rust (compile-time proof)      |       |
-| Annotation burden       | Lower than classic Rust                | Explore group borrowing, origin tracking, smarter inference |
-| Escape hatch            | Explicit `unsafe` blocks               | Same philosophy as Rust |
-| Interior mutability     | Safe patterns (similar to `RefCell`, `Mutex`) | Provided in std |
-| Concurrency             | Data-race freedom by construction      |       |
-
-## Comparison with Existing Languages
-
-- **Rust**: Gold standard. PureLang starts here and aims for slightly better ergonomics.
-- **Mojo**: Ownership + Python-like syntax. Excellent reference for reducing friction.
-- **Zig**: Manual memory management with excellent tools, but no borrow checker → weaker default safety.
-- **Go / Java / Python**: Rely on GC → runtime cost and non-determinism that PureLang explicitly rejects.
-
-## Implementation Notes for the Compiler
-
-1. The ownership/borrow checker runs after type checking.
-2. It builds a control-flow graph and proves that borrowing rules are never violated.
-3. Moves invalidate the previous owner.
-4. Drop glue is inserted automatically by the compiler (RAII).
-5. `unsafe` allows raw pointers and manual memory management when needed, but the boundary is explicit.
-
-## Example (Conceptual Syntax)
-
-```purelang
-fn process(data: Vec<i32>) {          // takes ownership
-    let first = &data[0];             // immutable borrow
-    println(first);
-    // data is still usable after the borrow ends
+```pure
+fn process(data) {          // ownership handled by compiler
+    print data.length
 }
 
-fn main() {
-    let mut numbers = vec![1, 2, 3];
-    process(numbers);                 // ownership moved
-    // numbers is no longer valid here
-}
+list = [1, 2, 3]
+process(list)               // safe transfer — list is no longer usable
 ```
 
-This model guarantees that if a PureLang program compiles (in safe mode), it is free of an entire class of memory safety bugs that plague C/C++.
+Most of the time you do not write special ownership annotations. The compiler tracks everything.
+
+## Mutability
+
+- Variables are **immutable by default**
+- Use `mut` only when you need to change a value
+
+```pure
+name = "Pure"               // cannot change
+mut health = 100            // can change
+health = health - 10
+```
+
+## Borrowing (Advanced)
+
+When needed, the language supports:
+
+- Immutable borrows (multiple allowed)
+- Mutable borrows (exclusive)
+
+These will surface more clearly as the type system matures. For early code, the simple ownership model is sufficient.
+
+## Benefits
+
+- No garbage collector pauses
+- Deterministic destruction (important for games and real-time systems)
+- Safety without sacrificing performance
+- Syntax stays clean and approachable
+
+## Comparison
+
+| Approach              | Runtime Cost | Safety          | Syntax Complexity |
+|-----------------------|--------------|-----------------|-------------------|
+| C / C++               | Zero         | None            | High              |
+| Garbage Collected     | Yes          | High            | Low               |
+| Classic Rust          | Zero         | High            | Medium-High       |
+| **PureLang**          | Zero         | High            | **Very Low**      |
+
+PureLang takes the safety and performance of ownership systems and packages them in the simplest practical syntax.

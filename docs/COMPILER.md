@@ -2,80 +2,63 @@
 
 ## Overview
 
-The PureLang compiler (`purec`) is written entirely in **Rust**. This choice provides:
+The PureLang compiler is called **`purec`**.
 
-- Memory safety while developing the compiler itself
-- Excellent ecosystem for parsing, diagnostics, and LLVM interop
-- Ability to dog-food the same ownership model the language provides
+It is written in Rust and currently at **Phase 1 (Lexer)**.
 
-## Pipeline Stages
+## Current Implementation
 
-1. **Lexing**  
-   Source text → Token stream
+```
+compiler/
+├── Cargo.toml
+├── src/
+│   ├── main.rs      # CLI entry point
+│   ├── token.rs     # Token definitions
+│   └── lexer.rs     # Lexer implementation
+```
 
-2. **Parsing**  
-   Token stream → Abstract Syntax Tree (AST)
+### What works today
 
-3. **Name Resolution**  
-   Resolve identifiers to definitions, build symbol tables
+```bash
+cd compiler
+cargo build
+cargo run -- ../examples/hello.pure
+```
 
-4. **Type Checking & Inference**  
-   Assign and verify types, perform type inference
+The lexer successfully tokenizes PureLang source files using the easy syntax.
 
-5. **Ownership & Borrow Checking**  
-   Prove memory safety rules
+## Planned Pipeline Stages
 
-6. **HIR / MIR Lowering** (optional intermediate forms)  
-   High-level IR → Mid-level IR for optimizations and analysis
-
-7. **Code Generation**
-   - Native path → LLVM IR → object code / executable
-   - Web path → WebAssembly module
+1. **Lexing** ← (completed)
+2. **Parsing** → Abstract Syntax Tree (AST)
+3. **Name Resolution**
+4. **Type Checking + Ownership Analysis**
+5. **IR Generation**
+6. **Code Generation**
+   - LLVM IR → native binaries
+   - WebAssembly
 
 ## Technology Choices
 
-| Stage              | Recommended Crates / Tools          | Notes |
-|--------------------|-------------------------------------|-------|
-| Parsing            | `pest`, `nom`, `lalrpop`, or hand-written recursive descent | Start simple |
-| Diagnostics        | `codespan`, `ariadne`, or `miette`  | Beautiful error messages |
-| LLVM Interop       | `inkwell` or `llvm-sys`             | Preferred: inkwell for safety |
-| CLI                | `clap`                              |       |
-| Testing            | `cargo test` + snapshot testing     |       |
-
-## LLVM Integration
-
-- Use LLVM’s C API via safe Rust bindings (`inkwell`).
-- Emit LLVM IR for the host architecture.
-- Reuse LLVM’s powerful optimization passes (`-O0` to `-O3`, LTO, etc.).
-- For WebAssembly: target `wasm32-unknown-unknown` or `wasm32-wasi` via LLVM.
-
-## Bootstrapping Plan
-
-1. **Stage 0**: Compiler written in Rust, can compile a tiny subset of PureLang.
-2. **Stage 1**: PureLang compiler can compile itself (self-hosting).
-3. **Stage 2**: Full language features + standard library written in PureLang.
+- **Language**: Rust
+- **Parsing**: Hand-written recursive descent (starting simple) or parser combinators later
+- **LLVM interop**: `inkwell` or `llvm-sys`
+- **CLI**: Simple argument parsing (will use `clap` later)
 
 ## Diagnostics Philosophy
 
 Errors should be:
-- Precise (point to the exact location)
+
+- Precise (exact location)
 - Helpful (suggest fixes when possible)
-- Beautiful (colored, structured, with source context)
+- Beautiful (colored, with source context)
 
-Example style (inspired by Rust and Elm):
+## Build Goals
 
-```
-error[E0308]: mismatched types
-  --> src/main.pl:12:18
-   |
-12 |     let x: i32 = "hello"
-   |                  ^^^^^^^ expected `i32`, found `&str`
-```
+- Single static binary for easy distribution
+- Fast incremental compilation (critical for game development)
+- Excellent cross-compilation support
 
-## Build & Distribution
+## Next Immediate Step
 
-- Single static binary for `purec` (easy distribution)
-- Cross-compilation support via LLVM
-- Future: package manager (`pure`) integrated with the compiler
-
-This design keeps the compiler lean, safe, and focused on producing excellent machine code while providing a delightful developer experience.
+Implement the **Parser** that turns the token stream into an Abstract Syntax Tree.

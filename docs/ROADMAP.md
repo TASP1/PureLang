@@ -1,66 +1,80 @@
 # PureLang Roadmap
 
-## Phase 0 — Foundations (Current)
+## Current Status (September 2026)
 
-- [x] Repository & documentation structure
-- [x] Architecture, Memory Model, Syntax, and Compiler design docs
-- [ ] Basic project scaffolding (Cargo workspace for the compiler)
+- [x] Project initialized & public repository
+- [x] Core design documents
+- [x] **Lexer implemented** (Phase 1 complete)
+- [ ] Parser + AST
+- [ ] Type checker + Ownership analysis
+- [ ] LLVM IR code generation
+- [ ] WebAssembly backend
+- [ ] Standard library
 
-## Phase 1 — Minimal Viable Compiler (MVP)
+## Phase 1 — Minimal Viable Compiler (In Progress)
 
-**Goal**: Compile a tiny subset of PureLang to native binary and WebAssembly.
+**Goal**: Tokenize → Parse → Generate simple native code
 
-- [ ] Lexer for basic tokens
-- [ ] Parser → AST for expressions, functions, variables
-- [ ] Simple type checker (i32, f64, bool, strings)
-- [ ] Basic ownership tracking (move semantics)
-- [ ] LLVM IR emission for the subset
-- [ ] Wasm emission for the same subset
-- [ ] `purec hello.pl -o hello` produces a working executable
-- [ ] `purec hello.pl --target wasm` produces a working `.wasm`
+- [x] Lexer for the easy PureLang syntax
+- [ ] Parser → Abstract Syntax Tree (AST)
+- [ ] Basic type checking
+- [ ] Simple ownership tracking
+- [ ] LLVM IR emission for a tiny subset
+- [ ] First native executable (`purec hello.pure -o hello`)
+- [ ] First WebAssembly module
 
-**Milestone Demo**: Fibonacci + Hello World running natively and in the browser.
+**Milestone**: Hello World + simple game loop running natively.
 
-## Phase 2 — Core Language
+## Phase 2 — Core Language Features
 
-- [ ] Full ownership & borrow checker
-- [ ] Structs, enums, pattern matching
-- [ ] Generics / type parameters
-- [ ] Traits / interfaces
-- [ ] Error handling (`Result`, `Option`)
-- [ ] Control flow (if, match, loops)
-- [ ] Modules and basic visibility
+- Full ownership & borrow checker
+- Structs, methods, enums
+- Pattern matching
+- Generics / traits
+- Error handling with `?`
+- Modules and visibility
+- Ranges, lists, basic collections
 
-## Phase 3 — Standard Library & Tooling
+## Phase 3 — Performance & Platforms
 
-- [ ] Core collections (`Vec`, `String`, `HashMap`, etc.) with full ownership safety
-- [ ] I/O, file system, networking primitives
-- [ ] Concurrency primitives (safe threads, channels, async foundation)
-- [ ] Formatter (`pure fmt`)
-- [ ] Language Server Protocol (LSP) prototype
-- [ ] Basic package manager design
+- Full LLVM optimization pipeline
+- WebAssembly + WASI target
+- Cross-compilation (Windows, macOS, Linux, iOS, Android)
+- Console targets (via platform SDKs + C ABI)
+- SIMD and data-oriented design helpers
+- Fast incremental compilation
 
-## Phase 4 — Production Readiness
+## Phase 4 — Standard Library & Tooling
 
-- [ ] Self-hosting compiler (PureLang compiler written in PureLang)
-- [ ] Comprehensive test suite + fuzzer
-- [ ] Cross-compilation for all major platforms
-- [ ] Debugger support (DWARF)
-- [ ] Documentation generator
-- [ ] Performance benchmarks vs Rust / C / Zig / Mojo
+- Core collections (Vec, String, Map, etc.)
+- File I/O, networking, concurrency primitives
+- Math / vector / matrix helpers (games & 3D)
+- Formatter (`pure fmt`)
+- Language Server (LSP)
+- Package manager foundation
 
-## Phase 5 — Ecosystem
+## Phase 5 — Ecosystem & Production
 
-- [ ] Package registry
-- [ ] IDE plugins (VS Code, Neovim, etc.)
-- [ ] Official website & tutorial series
-- [ ] Community governance
+- Self-hosting compiler
+- Comprehensive test suite + fuzzer
+- Debugger support
+- Documentation generator
+- Official website + tutorials
+- Community packages
+
+## Long-term Vision
+
+PureLang should become a practical choice for:
+
+- Game engines and games
+- 3D tools and real-time applications
+- AI / high-performance numerical code
+- Cross-platform native applications
+- Console development (where platform agreements allow)
 
 ## Success Metrics
 
-- A non-trivial program (e.g. simple web server or CLI tool) can be written in PureLang and run with performance comparable to Rust.
-- Memory safety bugs are impossible in safe code.
-- Newcomers from TypeScript/Python can become productive quickly.
-- The compiler itself is fast enough for interactive development.
-
-This roadmap is living and will be updated as the project evolves.
+- Newcomers can write useful programs within hours
+- Performance competitive with Rust / C++ / Zig
+- Memory safety guaranteed in safe code
+- Real projects (small games, tools, AI kernels) shipping in PureLang

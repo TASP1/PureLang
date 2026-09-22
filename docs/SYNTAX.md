@@ -1,99 +1,127 @@
 # PureLang Syntax Design
 
-## Guiding Principles
+**Goal: Far easier than even Python**
 
-- **Readable first**: Should feel natural to TypeScript and Python developers.
-- **Explicit when it matters**: Ownership, mutability, and types should be clear.
-- **Minimal noise**: Avoid excessive ceremony while remaining unambiguous.
-- **Progressive disclosure**: Simple programs look simple; advanced features are available when needed.
+PureLang prioritizes extreme readability and minimal cognitive load while remaining a high-performance systems language.
 
-## High-Level Feel
+## Core Principles
 
-PureLang aims for a hybrid of:
+- Minimal keywords
+- Almost no noise / ceremony
+- Immutable by default
+- Ownership mostly invisible (compiler handles safety)
+- One clear preferred way to do most things
+- Looks clean and modern
 
-- Python / TypeScript indentation-friendly or light-brace style
-- Rust’s explicitness around ownership and errors
-- Modern type inference
-
-## Conceptual Examples
+## Basic Syntax
 
 ### Hello World
+```pure
+print "Hello, PureLang"
+```
 
-```purelang
-fn main() {
-    println("Hello, PureLang!")
+### Variables
+```pure
+name = "PureLang"          // immutable by default
+mut count = 0              // only use `mut` when mutation is needed
+count = count + 1
+```
+
+### Functions
+```pure
+fn add(a, b) {
+    return a + b
+}
+
+fn greet(name) {
+    print "Hello, " + name
 }
 ```
 
-### Variables & Mutability
-
-```purelang
-let x = 42          // immutable by default
-let mut y = 10      // explicitly mutable
-y = y + 1
-```
-
-### Functions & Ownership
-
-```purelang
-fn take_ownership(v: Vec<i32>) {
-    // v is owned here and will be dropped at the end of the function
+### Control Flow
+```pure
+if score > 100 {
+    print "You win!"
+} else {
+    print "Try again"
 }
 
-fn borrow_immutably(v: &Vec<i32>) {
-    println(v.len())
+for i in 1..10 {
+    print i
 }
 
-fn borrow_mutably(v: &mut Vec<i32>) {
-    v.push(99)
+for item in list {
+    print item
 }
 ```
 
 ### Structs
-
-```purelang
+```pure
 struct Point {
-    x: f64
-    y: f64
+    x
+    y
 }
 
-fn distance(a: &Point, b: &Point) -> f64 {
-    let dx = a.x - b.x
-    let dy = a.y - b.y
-    (dx*dx + dy*dy).sqrt()
+p = Point(10, 20)
+print p.x
+```
+
+### Ownership (Mostly Invisible)
+```pure
+fn process(data) {         // ownership handled automatically
+    print data.length
+}
+
+numbers = [1, 2, 3]
+process(numbers)           // ownership transferred safely by the compiler
+```
+
+You almost never need to write special ownership syntax. The compiler protects you.
+
+### Error Handling
+```pure
+fn read_file(path) {
+    content = file.read(path)?     // `?` propagates errors cleanly
+    return content
 }
 ```
 
-### Error Handling (Conceptual)
-
-```purelang
-fn read_file(path: &str) -> Result<String, IoError> {
-    // ...
-}
-
+### Full Small Example
+```pure
 fn main() {
-    match read_file("config.toml") {
-        Ok(content) => println(content),
-        Err(e) => eprintln("Error: {e}")
+    name = "Player"
+    mut health = 100
+
+    print "Welcome, " + name
+
+    for i in 1..5 {
+        health = health - 10
+        print "Health: " + health
+
+        if health <= 0 {
+            print "Game Over"
+            return
+        }
     }
+
+    print "You survived!"
 }
 ```
 
-## Type System Highlights
+## Key Differences from Python
 
-- Strong static typing
-- Powerful type inference (most annotations optional in local contexts)
-- Generics / parametric polymorphism
-- Traits / interfaces for shared behavior
-- Algebraic data types (enums with payloads)
+| Feature              | Python                     | PureLang                          |
+|----------------------|----------------------------|-----------------------------------|
+| Mutability           | Everything mutable         | Immutable by default (safer)      |
+| Function keyword     | `def`                      | `fn` (shorter)                    |
+| Blocks               | Indentation only           | Braces (clearer + reliable)       |
+| Ownership / Safety   | None                       | Automatic compile-time safety     |
+| Error handling       | try/except boilerplate     | Simple `?`                        |
+| Type noise           | Often messy                | Almost never needed               |
 
-## Syntax Decisions Still Open
+## Design Philosophy
 
-- Indentation vs braces (or both, like Python 3.12+ style)
-- Exact keywords for ownership transfer (`move`, `^`, or implicit)
-- Async / await syntax
-- Pattern matching power level
+Simple programs look extremely simple.  
+Powerful features (ownership, types, generics, SIMD, etc.) are available when needed but stay out of the way for everyday code.
 
-These will be finalized after the first prototype compiler can run real programs.
-
-The goal is that a developer coming from TypeScript or Python should be productive within hours, while still enjoying Rust-level safety and performance.
+This syntax is intentionally designed so that someone who knows basic Python can become productive in PureLang within minutes, while still getting systems-level performance and safety.
