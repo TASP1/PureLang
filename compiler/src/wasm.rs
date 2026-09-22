@@ -43,6 +43,8 @@ impl WasmCodegen {
                 name,
                 params,
                 body,
+                type_params: _,
+                is_pub: _,
             } = item
                 && name == "main"
             {

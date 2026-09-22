@@ -1,0 +1,21 @@
+// Traits + impl
+
+struct Point {
+    x
+    y
+}
+
+trait HasSum {
+    fn sum(self)
+}
+
+impl HasSum for Point {
+    fn sum(self) {
+        return self.x + self.y
+    }
+}
+
+fn main() {
+    p = Point(3, 4)
+    print p.sum()
+}

@@ -74,25 +74,29 @@ impl Parser {
     }
 
     fn parse_item(&mut self) -> Result<Item, ParseError> {
+        let is_pub = if matches!(self.peek(), Token::Pub) {
+            self.advance();
+            true
+        } else {
+            false
+        };
         match self.peek() {
-            Token::Fn => self.parse_function(),
-            Token::Struct => self.parse_struct(),
-            Token::Enum => self.parse_enum(),
-            Token::Mod => self.parse_module(),
-            Token::Pub => {
-                self.advance(); // pub is accepted and ignored for MVP (all items public)
-                self.parse_item()
-            }
+            Token::Fn => self.parse_function(is_pub),
+            Token::Struct => self.parse_struct(is_pub),
+            Token::Enum => self.parse_enum(is_pub),
+            Token::Mod => self.parse_module(is_pub),
+            Token::Trait => self.parse_trait(is_pub),
+            Token::Impl => self.parse_impl(),
             other => Err(ParseError {
                 message: format!(
-                    "Expected top-level item (fn, struct, enum, or mod), found {:?}",
+                    "Expected top-level item (fn, struct, enum, mod, trait, impl), found {:?}",
                     other
                 ),
             }),
         }
     }
 
-    fn parse_function(&mut self) -> Result<Item, ParseError> {
+    fn parse_function(&mut self, is_pub: bool) -> Result<Item, ParseError> {
         self.expect(Token::Fn)?;
         // Support both `fn name(...)` and method form `fn Type.name(...)`
         let first = self.expect_ident()?;
@@ -103,6 +107,31 @@ impl Parser {
         } else {
             (None, first)
         };
+        // Optional generics: fn id[T](...) or fn id<T>(...)
+        let mut type_params = Vec::new();
+        if matches!(self.peek(), Token::LBracket) {
+            self.advance();
+            while !matches!(self.peek(), Token::RBracket | Token::Eof) {
+                type_params.push(self.expect_ident()?);
+                if matches!(self.peek(), Token::Comma) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+            self.expect(Token::RBracket)?;
+        } else if matches!(self.peek(), Token::Less) {
+            self.advance();
+            while !matches!(self.peek(), Token::Greater | Token::Eof) {
+                type_params.push(self.expect_ident()?);
+                if matches!(self.peek(), Token::Comma) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+            self.expect(Token::Greater)?;
+        }
         self.expect(Token::LParen)?;
 
         let mut params = Vec::new();
@@ -131,12 +160,14 @@ impl Parser {
         Ok(Item::Function {
             receiver,
             name,
+            type_params,
             params,
             body,
+            is_pub,
         })
     }
 
-    fn parse_struct(&mut self) -> Result<Item, ParseError> {
+    fn parse_struct(&mut self, is_pub: bool) -> Result<Item, ParseError> {
         self.expect(Token::Struct)?;
         let name = self.expect_ident()?;
         self.expect(Token::LBrace)?;
@@ -144,16 +175,15 @@ impl Parser {
         let mut fields = Vec::new();
         while !matches!(self.peek(), Token::RBrace) {
             fields.push(self.expect_ident()?);
-            // optional comma
             if matches!(self.peek(), Token::Comma) {
                 self.advance();
             }
         }
         self.expect(Token::RBrace)?;
-        Ok(Item::Struct { name, fields })
+        Ok(Item::Struct { name, fields, is_pub })
     }
 
-    fn parse_enum(&mut self) -> Result<Item, ParseError> {
+    fn parse_enum(&mut self, is_pub: bool) -> Result<Item, ParseError> {
         self.expect(Token::Enum)?;
         let name = self.expect_ident()?;
         self.expect(Token::LBrace)?;
@@ -186,10 +216,10 @@ impl Parser {
             }
         }
         self.expect(Token::RBrace)?;
-        Ok(Item::Enum { name, variants })
+        Ok(Item::Enum { name, variants, is_pub })
     }
 
-    fn parse_module(&mut self) -> Result<Item, ParseError> {
+    fn parse_module(&mut self, is_pub: bool) -> Result<Item, ParseError> {
         self.expect(Token::Mod)?;
         let name = self.expect_ident()?;
         self.expect(Token::LBrace)?;
@@ -198,7 +228,85 @@ impl Parser {
             items.push(self.parse_item()?);
         }
         self.expect(Token::RBrace)?;
-        Ok(Item::Module { name, items })
+        Ok(Item::Module { name, items, is_pub })
+    }
+
+
+    fn parse_trait(&mut self, is_pub: bool) -> Result<Item, ParseError> {
+        self.expect(Token::Trait)?;
+        let name = self.expect_ident()?;
+        self.expect(Token::LBrace)?;
+        let mut methods = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            // optional pub inside trait
+            if matches!(self.peek(), Token::Pub) {
+                self.advance();
+            }
+            self.expect(Token::Fn)?;
+            let mname = self.expect_ident()?;
+            self.expect(Token::LParen)?;
+            let mut params = Vec::new();
+            if !matches!(self.peek(), Token::RParen) {
+                loop {
+                    let pname = self.expect_ident()?;
+                    let ty_annotation = if matches!(self.peek(), Token::Colon) {
+                        self.advance();
+                        Some(self.expect_ident()?)
+                    } else {
+                        None
+                    };
+                    params.push(Param { name: pname, ty_annotation });
+                    if matches!(self.peek(), Token::Comma) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+            }
+            self.expect(Token::RParen)?;
+            // optional empty body or just signature
+            if matches!(self.peek(), Token::LBrace) {
+                let _ = self.parse_block()?;
+            }
+            methods.push(TraitMethod { name: mname, params });
+        }
+        self.expect(Token::RBrace)?;
+        Ok(Item::Trait { name, methods, is_pub })
+    }
+
+    fn parse_impl(&mut self) -> Result<Item, ParseError> {
+        self.expect(Token::Impl)?;
+        // `impl Trait for Type { ... }` or `impl Type { ... }`
+        let first = self.expect_ident()?;
+        let (trait_name, type_name) = if matches!(self.peek(), Token::For) {
+            self.advance();
+            let ty = self.expect_ident()?;
+            (Some(first), ty)
+        } else {
+            (None, first)
+        };
+        self.expect(Token::LBrace)?;
+        let mut methods = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            if matches!(self.peek(), Token::Pub) {
+                self.advance();
+            }
+            // Methods in impl are functions with receiver = type_name
+            let mut item = self.parse_function(true)?;
+            if let Item::Function { ref mut receiver, .. } = item {
+                if receiver.is_none() {
+                    // Treat first param as self of type_name when defining bare fn in impl
+                    *receiver = Some(type_name.clone());
+                }
+            }
+            methods.push(item);
+        }
+        self.expect(Token::RBrace)?;
+        Ok(Item::Impl {
+            trait_name,
+            type_name,
+            methods,
+        })
     }
 
     fn parse_block(&mut self) -> Result<Block, ParseError> {

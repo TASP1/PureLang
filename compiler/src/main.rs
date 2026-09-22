@@ -29,7 +29,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.9.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
+        println!("purec 0.10.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
         return;
     }
 
@@ -290,9 +290,17 @@ fn print_item(item: &Item, level: usize) {
         Item::Function {
             receiver,
             name,
+            type_params,
             params,
             body,
+            is_pub,
         } => {
+            let vis = if *is_pub { "pub " } else { "" };
+            let gens = if type_params.is_empty() {
+                String::new()
+            } else {
+                format!("[{}]", type_params.join(", "))
+            };
             let ps: Vec<String> = params
                 .iter()
                 .map(|p| match &p.ty_annotation {
@@ -302,25 +310,36 @@ fn print_item(item: &Item, level: usize) {
                 .collect();
             if let Some(recv) = receiver {
                 println!(
-                    "{}Fn {}.{}({})",
+                    "{}{}Fn {}.{}{}({})",
                     indent(level),
+                    vis,
                     recv,
                     name,
+                    gens,
                     ps.join(", ")
                 );
             } else {
-                println!("{}Fn {}({})", indent(level), name, ps.join(", "));
+                println!(
+                    "{}{}Fn {}{}({})",
+                    indent(level),
+                    vis,
+                    name,
+                    gens,
+                    ps.join(", ")
+                );
             }
             print_block(body, level + 1);
         }
-        Item::Struct { name, fields } => {
-            println!("{}Struct {}", indent(level), name);
+        Item::Struct { name, fields, is_pub } => {
+            let vis = if *is_pub { "pub " } else { "" };
+            println!("{}{}Struct {}", indent(level), vis, name);
             for f in fields {
                 println!("{}Field {}", indent(level + 1), f);
             }
         }
-        Item::Enum { name, variants } => {
-            println!("{}Enum {}", indent(level), name);
+        Item::Enum { name, variants, is_pub } => {
+            let vis = if *is_pub { "pub " } else { "" };
+            println!("{}{}Enum {}", indent(level), vis, name);
             for v in variants {
                 if v.fields.is_empty() {
                     println!("{}Variant {}", indent(level + 1), v.name);
@@ -334,10 +353,32 @@ fn print_item(item: &Item, level: usize) {
                 }
             }
         }
-        Item::Module { name, items } => {
-            println!("{}Mod {}", indent(level), name);
+        Item::Module { name, items, is_pub } => {
+            let vis = if *is_pub { "pub " } else { "" };
+            println!("{}{}Mod {}", indent(level), vis, name);
             for it in items {
                 print_item(it, level + 1);
+            }
+        }
+        Item::Trait { name, methods, is_pub } => {
+            let vis = if *is_pub { "pub " } else { "" };
+            println!("{}{}Trait {}", indent(level), vis, name);
+            for m in methods {
+                println!("{}fn {}", indent(level + 1), m.name);
+            }
+        }
+        Item::Impl {
+            trait_name,
+            type_name,
+            methods,
+        } => {
+            if let Some(tr) = trait_name {
+                println!("{}Impl {} for {}", indent(level), tr, type_name);
+            } else {
+                println!("{}Impl {}", indent(level), type_name);
+            }
+            for m in methods {
+                print_item(m, level + 1);
             }
         }
     }

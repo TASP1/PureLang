@@ -15,6 +15,8 @@ pub enum Type {
     Struct(String),
     /// Named enum type
     Enum(String),
+    /// Generic type parameter (T, U, ...)
+    Generic(String),
     /// Function type (params -> return)
     Function {
         params: Vec<Type>,
@@ -31,7 +33,7 @@ impl Type {
     pub fn is_copy(&self) -> bool {
         matches!(
             self,
-            Type::Number | Type::Bool | Type::Range | Type::Void | Type::Enum(_) | Type::Unknown
+            Type::Number | Type::Bool | Type::Range | Type::Void | Type::Enum(_) | Type::Generic(_) | Type::Unknown
         )
     }
 
@@ -64,6 +66,7 @@ impl fmt::Display for Type {
             Type::List(inner) => write!(f, "List<{inner}>"),
             Type::Struct(name) => write!(f, "{name}"),
             Type::Enum(name) => write!(f, "{name}"),
+            Type::Generic(name) => write!(f, "{name}"),
             Type::Function { params, ret } => {
                 let ps: Vec<String> = params.iter().map(|p| p.to_string()).collect();
                 write!(f, "fn({}) -> {}", ps.join(", "), ret)

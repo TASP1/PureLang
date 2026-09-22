@@ -13,23 +13,48 @@ pub enum Item {
         /// Optional receiver type for methods: `fn Point.distance(self) { ... }`
         receiver: Option<String>,
         name: String,
+        /// Generic type parameters: `fn id[T](x: T)`
+        type_params: Vec<String>,
         params: Vec<Param>,
         body: Block,
+        /// Visible outside its module
+        is_pub: bool,
     },
     Struct {
         name: String,
         fields: Vec<String>,
+        is_pub: bool,
     },
     /// `enum Color { Red Green Blue }` or with payload `Some(value)`
     Enum {
         name: String,
         variants: Vec<EnumVariant>,
+        is_pub: bool,
     },
     /// `mod name { ... }`
     Module {
         name: String,
         items: Vec<Item>,
+        is_pub: bool,
     },
+    /// `trait Show { fn show(self) }`
+    Trait {
+        name: String,
+        methods: Vec<TraitMethod>,
+        is_pub: bool,
+    },
+    /// `impl Show for Point { fn show(self) { ... } }`
+    Impl {
+        trait_name: Option<String>,
+        type_name: String,
+        methods: Vec<Item>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitMethod {
+    pub name: String,
+    pub params: Vec<Param>,
 }
 
 /// Function parameter: `name` or `name: Type`

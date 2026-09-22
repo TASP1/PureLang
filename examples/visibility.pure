@@ -1,0 +1,15 @@
+// Visibility: pub items
+
+mod util {
+    pub fn public_add(a: Number, b: Number) {
+        return a + b
+    }
+
+    fn private_double(x: Number) {
+        return x * 2
+    }
+}
+
+fn main() {
+    print util.public_add(10, 32)
+}

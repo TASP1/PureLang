@@ -1,0 +1,10 @@
+// Generics: fn id[T](x: T)
+
+fn id[T](x: T) {
+    return x
+}
+
+fn main() {
+    print id(42)
+    print id(7)
+}

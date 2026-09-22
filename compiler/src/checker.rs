@@ -26,6 +26,8 @@ pub struct TypeChecker {
     scopes: Vec<Scope>,
     /// Top-level functions
     functions: HashMap<String, Type>,
+    /// function name → is_pub
+    functions_pub: HashMap<String, bool>,
     /// Methods: (StructName, method_name) → Function type (first param is the receiver)
     methods: HashMap<(String, String), Type>,
     /// Struct name → field names (order matters)
@@ -42,6 +44,7 @@ impl TypeChecker {
                 vars: HashMap::new(),
             }],
             functions: HashMap::new(),
+            functions_pub: HashMap::new(),
             methods: HashMap::new(),
             structs: HashMap::new(),
             enums: HashMap::new(),
@@ -55,38 +58,79 @@ impl TypeChecker {
         let mut out = Vec::new();
         for item in items {
             match item {
-                Item::Module { name, items } => {
+                Item::Module { name, items, .. } => {
                     for inner in Self::flatten_items(items) {
                         match inner {
                             Item::Function {
                                 receiver,
                                 name: fname,
+                                type_params,
                                 params,
                                 body,
+                                is_pub,
                             } => {
                                 out.push(Item::Function {
                                     receiver,
                                     name: format!("{}_{}", name, fname),
+                                    type_params,
                                     params,
                                     body,
+                                    is_pub,
                                 });
                             }
-                            Item::Struct { name: sname, fields } => {
+                            Item::Struct {
+                                name: sname,
+                                fields,
+                                is_pub,
+                            } => {
                                 out.push(Item::Struct {
                                     name: format!("{}_{}", name, sname),
                                     fields,
+                                    is_pub,
                                 });
                             }
-                            Item::Enum { name: ename, variants } => {
+                            Item::Enum {
+                                name: ename,
+                                variants,
+                                is_pub,
+                            } => {
                                 out.push(Item::Enum {
                                     name: format!("{}_{}", name, ename),
                                     variants,
+                                    is_pub,
                                 });
                             }
-                            Item::Module { .. } => {}
+                            other => out.push(other),
                         }
                     }
                 }
+                Item::Impl {
+                    type_name,
+                    methods,
+                    ..
+                } => {
+                    for m in methods {
+                        if let Item::Function {
+                            name: fname,
+                            type_params,
+                            params,
+                            body,
+                            is_pub,
+                            ..
+                        } = m
+                        {
+                            out.push(Item::Function {
+                                receiver: Some(type_name.clone()),
+                                name: fname.clone(),
+                                type_params: type_params.clone(),
+                                params: params.clone(),
+                                body: body.clone(),
+                                is_pub: *is_pub,
+                            });
+                        }
+                    }
+                }
+                Item::Trait { .. } => {}
                 other => out.push(other.clone()),
             }
         }
@@ -98,10 +142,10 @@ impl TypeChecker {
         // First pass: register structs, enums and function signatures
         for item in &flat {
             match item {
-                Item::Struct { name, fields } => {
+                Item::Struct { name, fields, is_pub: _ } => {
                     self.structs.insert(name.clone(), fields.clone());
                 }
-                Item::Enum { name, variants } => {
+                Item::Enum { name, variants, is_pub: _ } => {
                     let vs: Vec<(String, usize)> = variants
                         .iter()
                         .map(|v| (v.name.clone(), v.fields.len()))
@@ -109,12 +153,18 @@ impl TypeChecker {
                     self.enums.insert(name.clone(), vs);
                 }
                 Item::Module { .. } => {}
+                Item::Trait { .. } => {}
+                Item::Impl { .. } => {}
                 Item::Function {
                     receiver,
                     name,
+                    type_params,
                     params,
                     body,
+                    is_pub,
                 } => {
+                    let _ = type_params;
+                    let pub_flag = *is_pub;
                     let ret = Self::infer_return_type(body);
                     if let Some(recv) = receiver {
                         let mut param_tys: Vec<Type> = vec![Type::Struct(recv.clone())];
@@ -145,6 +195,7 @@ impl TypeChecker {
                                 ret: Box::new(ret),
                             },
                         );
+                        self.functions_pub.insert(name.clone(), pub_flag);
                     }
                 }
             }
@@ -282,6 +333,9 @@ impl TypeChecker {
             Some("Number") | Some("number") => Type::Number,
             Some("String") | Some("string") => Type::String,
             Some("Bool") | Some("bool") => Type::Bool,
+            Some(name) if name.len() == 1 && name.chars().next().unwrap().is_uppercase() => {
+                Type::Generic(name.to_string())
+            }
             Some(name) => Type::Struct(name.to_string()),
         }
     }
@@ -297,6 +351,8 @@ impl TypeChecker {
                     Type::Struct(name.to_string())
                 } else if self.enums.contains_key(name) {
                     Type::Enum(name.to_string())
+                } else if name.len() == 1 && name.chars().next().unwrap().is_uppercase() {
+                    Type::Generic(name.to_string())
                 } else {
                     Type::Struct(name.to_string())
                 }
@@ -379,8 +435,10 @@ impl TypeChecker {
             Item::Function {
                 receiver,
                 name: _,
+                type_params: _,
                 params,
                 body,
+                is_pub: _,
             } => {
                 self.push_scope();
                 if let Some(recv) = receiver {
@@ -407,6 +465,12 @@ impl TypeChecker {
                 // Enum declarations are fine for now; no body to check
             }
             Item::Module { .. } => {}
+            Item::Trait { .. } => {}
+            Item::Impl { methods, .. } => {
+                for m in methods {
+                    self.check_item(m);
+                }
+            }
         }
     }
 
@@ -858,6 +922,12 @@ impl TypeChecker {
             if let Expr::Ident(mod_name) = object.as_ref() {
                 let full = format!("{}_{}", mod_name, field);
                 if let Some(fty) = self.functions.get(&full).cloned() {
+                    if self.functions_pub.get(&full) == Some(&false) {
+                        self.error(format!(
+                            "Function '{}' is private and cannot be called from outside its module",
+                            full
+                        ));
+                    }
                     let arg_tys: Vec<Type> = args.iter().map(|a| self.check_expr(a)).collect();
                     if let Type::Function { params, ret } = fty {
                         if params.len() != arg_tys.len() {
@@ -932,7 +1002,12 @@ impl TypeChecker {
                         }
                         // type-check extra args against params[1..]
                         for (i, (p, a)) in params.iter().skip(1).zip(arg_tys.iter()).enumerate() {
-                            if *p != Type::Unknown && *a != Type::Unknown && p != a {
+                            let compatible = *p == Type::Unknown
+                                || *a == Type::Unknown
+                                || p == a
+                                || matches!(p, Type::Generic(_))
+                                || matches!(a, Type::Generic(_));
+                            if !compatible {
                                 self.error(format!(
                                     "Argument {} type mismatch: expected {}, found {}",
                                     i + 1,
@@ -972,7 +1047,12 @@ impl TypeChecker {
                     ));
                 }
                 for (i, (p, a)) in params.iter().zip(arg_tys.iter()).enumerate() {
-                    if *p != Type::Unknown && *a != Type::Unknown && p != a {
+                    let compatible = *p == Type::Unknown
+                        || *a == Type::Unknown
+                        || p == a
+                        || matches!(p, Type::Generic(_))
+                        || matches!(a, Type::Generic(_));
+                    if !compatible {
                         self.error(format!(
                             "Argument {} type mismatch: expected {}, found {}",
                             i + 1,

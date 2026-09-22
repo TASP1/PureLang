@@ -64,38 +64,79 @@ impl Codegen {
         let mut out = Vec::new();
         for item in items {
             match item {
-                Item::Module { name, items } => {
+                Item::Module { name, items, .. } => {
                     for inner in Self::flatten_items(items) {
                         match inner {
                             Item::Function {
                                 receiver,
                                 name: fname,
+                                type_params,
                                 params,
                                 body,
+                                is_pub,
                             } => {
                                 out.push(Item::Function {
                                     receiver,
                                     name: format!("{}_{}", name, fname),
+                                    type_params,
                                     params,
                                     body,
+                                    is_pub,
                                 });
                             }
-                            Item::Struct { name: sname, fields } => {
+                            Item::Struct {
+                                name: sname,
+                                fields,
+                                is_pub,
+                            } => {
                                 out.push(Item::Struct {
                                     name: format!("{}_{}", name, sname),
                                     fields,
+                                    is_pub,
                                 });
                             }
-                            Item::Enum { name: ename, variants } => {
+                            Item::Enum {
+                                name: ename,
+                                variants,
+                                is_pub,
+                            } => {
                                 out.push(Item::Enum {
                                     name: format!("{}_{}", name, ename),
                                     variants,
+                                    is_pub,
                                 });
                             }
-                            Item::Module { .. } => {}
+                            other => out.push(other),
                         }
                     }
                 }
+                Item::Impl {
+                    type_name,
+                    methods,
+                    ..
+                } => {
+                    for m in methods {
+                        if let Item::Function {
+                            name: fname,
+                            type_params,
+                            params,
+                            body,
+                            is_pub,
+                            ..
+                        } = m
+                        {
+                            out.push(Item::Function {
+                                receiver: Some(type_name.clone()),
+                                name: fname.clone(),
+                                type_params: type_params.clone(),
+                                params: params.clone(),
+                                body: body.clone(),
+                                is_pub: *is_pub,
+                            });
+                        }
+                    }
+                }
+                Item::Trait { .. } => {}
                 other => out.push(other.clone()),
             }
         }
@@ -109,13 +150,13 @@ impl Codegen {
         // Register structs, enums & functions first
         for item in &flat {
             match item {
-                Item::Struct { name, fields } => {
+                Item::Struct { name, fields, is_pub: _ } => {
                     self.structs.insert(name.clone(), fields.clone());
                     // %Point = type { i64, i64, ... }
                     let fields_ir = fields.iter().map(|_| "i64").collect::<Vec<_>>().join(", ");
                     let _ = writeln!(self.types_ir, "%{} = type {{ {} }}", name, fields_ir);
                 }
-                Item::Enum { name, variants } => {
+                Item::Enum { name, variants, is_pub: _ } => {
                     let vs: Vec<(String, usize)> = variants
                         .iter()
                         .map(|v| (v.name.clone(), v.fields.len()))
@@ -123,10 +164,14 @@ impl Codegen {
                     self.enums.insert(name.clone(), vs);
                 }
                 Item::Module { .. } => {}
+                Item::Trait { .. } => {}
+                Item::Impl { .. } => {}
                 Item::Function {
                     receiver,
                     name,
                     params,
+                    type_params: _,
+                    is_pub: _,
                     ..
                 } => {
                     let full_name = if let Some(recv) = receiver {
@@ -139,12 +184,18 @@ impl Codegen {
                     if receiver.is_some() {
                         is_ptr.push(true); // self
                         for p in params.iter().skip(1) {
-                            let ptr = matches!(
-                                p.ty_annotation.as_deref(),
-                                Some("String") | Some("string")
-                            ) || p.ty_annotation.as_ref().map(|s| {
-                                s != "Number" && s != "number" && s != "Bool" && s != "bool"
-                            }).unwrap_or(false);
+                            let ptr = match p.ty_annotation.as_deref() {
+                                Some("String") | Some("string") => true,
+                                Some("Number") | Some("number") | Some("Bool") | Some("bool")
+                                | None => false,
+                                Some(name)
+                                    if name.len() == 1
+                                        && name.chars().next().unwrap().is_uppercase() =>
+                                {
+                                    false // generic type param → i64 for MVP
+                                }
+                                Some(_) => true, // struct/enum-like
+                            };
                             is_ptr.push(ptr);
                         }
                         if params.is_empty() {
@@ -154,12 +205,18 @@ impl Codegen {
                         }
                     } else {
                         for p in params {
-                            let ptr = matches!(
-                                p.ty_annotation.as_deref(),
-                                Some("String") | Some("string")
-                            ) || p.ty_annotation.as_ref().map(|s| {
-                                s != "Number" && s != "number" && s != "Bool" && s != "bool"
-                            }).unwrap_or(false);
+                            let ptr = match p.ty_annotation.as_deref() {
+                                Some("String") | Some("string") => true,
+                                Some("Number") | Some("number") | Some("Bool") | Some("bool")
+                                | None => false,
+                                Some(name)
+                                    if name.len() == 1
+                                        && name.chars().next().unwrap().is_uppercase() =>
+                                {
+                                    false // generic type param → i64 for MVP
+                                }
+                                Some(_) => true, // struct/enum-like
+                            };
                             is_ptr.push(ptr);
                         }
                     }
@@ -175,6 +232,8 @@ impl Codegen {
                 name,
                 params,
                 body,
+                type_params: _,
+                is_pub: _,
             } = item
             {
                 let full_name = if let Some(recv) = receiver {

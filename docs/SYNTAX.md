@@ -229,3 +229,44 @@ fn main() {
     print math.add(1, 2)
 }
 ```
+
+
+### Generics
+
+```pure
+fn id[T](x: T) {
+    return x
+}
+
+fn main() {
+    print id(42)
+}
+```
+
+### Traits and impl
+
+```pure
+trait HasSum {
+    fn sum(self)
+}
+
+impl HasSum for Point {
+    fn sum(self) {
+        return self.x + self.y
+    }
+}
+```
+
+### Visibility
+
+```pure
+mod util {
+    pub fn open(x: Number) { return x }
+    fn secret(x: Number) { return x }  // private
+}
+
+fn main() {
+    print util.open(1)   // ok
+    // print util.secret(1)  // error: private
+}
+```

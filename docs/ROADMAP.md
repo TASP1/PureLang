@@ -37,10 +37,10 @@
 - [x] Full ownership & borrow checker (moves + borrows)
 - [x] Enums + match (`enum Color { Red Green }` + `match c { Color.Red => ... }`)
 
-- [ ] Generics / traits
+- [x] Generics (`fn id[T](x: T)`) + traits (`trait` / `impl`)
 - [x] Error handling with `?`
 - [x] Modules (`mod name { ... }` + `name.fn()`)
-- [ ] Visibility refinements
+- [x] Visibility (`pub` enforced across modules)
 
 ## Phase 3 — Performance & Platforms
 
