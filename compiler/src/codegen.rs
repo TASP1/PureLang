@@ -8,12 +8,18 @@ use crate::ast::*;
 pub struct Codegen {
     preamble: String,
     strings_ir: String,
+    types_ir: String,
     body: String,
     strings: HashMap<String, String>,
     string_counter: usize,
     temp: usize,
     label: usize,
     vars: HashMap<String, (String, VarKind)>,
+    /// function name → param count (all i64 for now)
+    functions: HashMap<String, usize>,
+    /// struct name → field names
+    structs: HashMap<String, Vec<String>>,
+    current_is_main: bool,
     errors: Vec<String>,
 }
 
@@ -21,6 +27,8 @@ pub struct Codegen {
 enum VarKind {
     Number,
     String,
+    /// Pointer to a struct value on the stack
+    Struct,
 }
 
 impl Codegen {
@@ -28,18 +36,37 @@ impl Codegen {
         Codegen {
             preamble: String::new(),
             strings_ir: String::new(),
+            types_ir: String::new(),
             body: String::new(),
             strings: HashMap::new(),
             string_counter: 0,
             temp: 0,
             label: 0,
             vars: HashMap::new(),
+            functions: HashMap::new(),
+            structs: HashMap::new(),
+            current_is_main: true,
             errors: Vec::new(),
         }
     }
 
     pub fn generate(&mut self, program: &Program) -> Result<String, Vec<String>> {
         self.emit_preamble();
+
+        // Register structs & functions first
+        for item in &program.items {
+            match item {
+                Item::Struct { name, fields } => {
+                    self.structs.insert(name.clone(), fields.clone());
+                    // %Point = type { i64, i64, ... }
+                    let fields_ir = fields.iter().map(|_| "i64").collect::<Vec<_>>().join(", ");
+                    let _ = writeln!(self.types_ir, "%{} = type {{ {} }}", name, fields_ir);
+                }
+                Item::Function { name, params, .. } => {
+                    self.functions.insert(name.clone(), params.len());
+                }
+            }
+        }
 
         let mut funcs = String::new();
         for item in &program.items {
@@ -55,6 +82,8 @@ impl Codegen {
 
         let mut out = String::new();
         out.push_str(&self.preamble);
+        out.push_str(&self.types_ir);
+        out.push('\n');
         out.push_str(&self.strings_ir);
         out.push('\n');
         out.push_str(&funcs);
@@ -131,14 +160,26 @@ impl Codegen {
         self.temp = 0;
         self.label = 0;
         self.body.clear();
-        let _ = params;
 
         let is_main = name == "main";
+        self.current_is_main = is_main;
         if is_main {
             self.body.push_str("define i32 @main() {\nentry:\n");
         } else {
-            let _ = writeln!(self.body, "define void @{}() {{", name);
+            let param_list = params
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("i64 %arg{}", i))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let _ = writeln!(self.body, "define i64 @{}({}) {{", name, param_list);
             self.body.push_str("entry:\n");
+            for (i, p) in params.iter().enumerate() {
+                let ptr = format!("%{}.addr", p);
+                let _ = writeln!(self.body, "  {} = alloca i64, align 8", ptr);
+                let _ = writeln!(self.body, "  store i64 %arg{}, ptr {}, align 8", i, ptr);
+                self.vars.insert(p.clone(), (ptr, VarKind::Number));
+            }
         }
 
         self.emit_block(body);
@@ -146,7 +187,8 @@ impl Codegen {
         if is_main {
             self.body.push_str("  ret i32 0\n}\n\n");
         } else {
-            self.body.push_str("  ret void\n}\n\n");
+            // default return 0 if no explicit return
+            self.body.push_str("  ret i64 0\n}\n\n");
         }
     }
 
@@ -170,7 +212,7 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String => {
+                        VarKind::String | VarKind::Struct => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -183,7 +225,7 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String => {
+                        VarKind::String | VarKind::Struct => {
                             let _ = writeln!(self.body, "  {} = alloca ptr, align 8", ptr);
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
@@ -200,7 +242,7 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String => {
+                        VarKind::String | VarKind::Struct => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -286,18 +328,33 @@ impl Codegen {
                 }
             }
             Stmt::Return(None) => {
-                let _ = writeln!(self.body, "  ret i32 0");
+                if self.current_is_main {
+                    let _ = writeln!(self.body, "  ret i32 0");
+                } else {
+                    let _ = writeln!(self.body, "  ret i64 0");
+                }
                 let cont = self.fresh_label("after.ret");
                 let _ = writeln!(self.body, "{}:", cont);
             }
             Stmt::Return(Some(expr)) => {
                 let (v, kind) = self.emit_expr(expr);
-                if kind == VarKind::Number {
-                    let t = self.fresh();
-                    let _ = writeln!(self.body, "  {} = trunc i64 {} to i32", t, v);
-                    let _ = writeln!(self.body, "  ret i32 {}", t);
+                if self.current_is_main {
+                    if kind == VarKind::Number {
+                        let t = self.fresh();
+                        let _ = writeln!(self.body, "  {} = trunc i64 {} to i32", t, v);
+                        let _ = writeln!(self.body, "  ret i32 {}", t);
+                    } else {
+                        let _ = writeln!(self.body, "  ret i32 0");
+                    }
                 } else {
-                    let _ = writeln!(self.body, "  ret i32 0");
+                    match kind {
+                        VarKind::Number => {
+                            let _ = writeln!(self.body, "  ret i64 {}", v);
+                        }
+                        _ => {
+                            let _ = writeln!(self.body, "  ret i64 0");
+                        }
+                    }
                 }
                 let cont = self.fresh_label("after.ret");
                 let _ = writeln!(self.body, "{}:", cont);
@@ -383,6 +440,22 @@ impl Codegen {
                     fmt, val
                 );
             }
+            VarKind::Struct => {
+                // print as pointer address for now
+                let fmt = self.fresh();
+                let _ = writeln!(
+                    self.body,
+                    "  {} = getelementptr inbounds [6 x i8], ptr @.fmt_i64, i64 0, i64 0",
+                    fmt
+                );
+                let as_i64 = self.fresh();
+                let _ = writeln!(self.body, "  {} = ptrtoint ptr {} to i64", as_i64, val);
+                let _ = writeln!(
+                    self.body,
+                    "  call i32 (ptr, ...) @printf(ptr {}, i64 {})",
+                    fmt, as_i64
+                );
+            }
         }
     }
 
@@ -412,7 +485,7 @@ impl Codegen {
                                 loaded, ptr
                             );
                         }
-                        VarKind::String => {
+                        VarKind::String | VarKind::Struct => {
                             let _ = writeln!(
                                 self.body,
                                 "  {} = load ptr, ptr {}, align 8",
@@ -492,14 +565,85 @@ impl Codegen {
                 self.errors.push("codegen: lists not supported yet".into());
                 ("0".into(), VarKind::Number)
             }
-            Expr::Call { .. } => {
-                self.errors.push("codegen: calls not supported yet".into());
+            Expr::Call { callee, args } => {
+                // Struct construction or function call
+                if let Expr::Ident(name) = callee.as_ref() {
+                    if let Some(fields) = self.structs.get(name).cloned() {
+                        // alloca struct, store fields
+                        let ptr = self.fresh();
+                        let _ = writeln!(self.body, "  {} = alloca %{}, align 8", ptr, name);
+                        for (i, arg) in args.iter().enumerate() {
+                            let (v, _) = self.emit_expr(arg);
+                            let fp = self.fresh();
+                            let _ = writeln!(
+                                self.body,
+                                "  {} = getelementptr inbounds %{}, ptr {}, i32 0, i32 {}",
+                                fp, name, ptr, i
+                            );
+                            let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", v, fp);
+                            let _ = fields; // silence
+                        }
+                        return (ptr, VarKind::Struct);
+                    }
+                    if self.functions.contains_key(name) {
+                        let mut arg_vals = Vec::new();
+                        for a in args {
+                            let (v, k) = self.emit_expr(a);
+                            if k != VarKind::Number {
+                                self.errors.push(format!(
+                                    "codegen: only Number args supported in calls for now ({})",
+                                    name
+                                ));
+                            }
+                            arg_vals.push(v);
+                        }
+                        let args_ir = arg_vals
+                            .iter()
+                            .map(|v| format!("i64 {}", v))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let res = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call i64 @{}({})", res, name, args_ir);
+                        return (res, VarKind::Number);
+                    }
+                }
+                self.errors.push("codegen: unsupported call".into());
                 ("0".into(), VarKind::Number)
             }
-            Expr::Field { .. } => {
-                self.errors
-                    .push("codegen: field access not supported yet".into());
-                ("0".into(), VarKind::Number)
+            Expr::Field { object, field } => {
+                let (obj, kind) = self.emit_expr(object);
+                if kind != VarKind::Struct {
+                    self.errors
+                        .push("codegen: field access on non-struct".into());
+                    return ("0".into(), VarKind::Number);
+                }
+                // find field index from struct type of... we don't track struct name on VarKind
+                // Heuristic: look at getelementptr - need struct name. Store as StructName in vars.
+                // For MVP: try all structs for field name
+                let mut idx = None;
+                let mut sname = None;
+                for (sn, fields) in &self.structs {
+                    if let Some(i) = fields.iter().position(|f| f == field) {
+                        idx = Some(i);
+                        sname = Some(sn.clone());
+                        break;
+                    }
+                }
+                if let (Some(i), Some(sn)) = (idx, sname) {
+                    let fp = self.fresh();
+                    let _ = writeln!(
+                        self.body,
+                        "  {} = getelementptr inbounds %{}, ptr {}, i32 0, i32 {}",
+                        fp, sn, obj, i
+                    );
+                    let loaded = self.fresh();
+                    let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", loaded, fp);
+                    (loaded, VarKind::Number)
+                } else {
+                    self.errors
+                        .push(format!("codegen: unknown field '{}'", field));
+                    ("0".into(), VarKind::Number)
+                }
             }
         }
     }
@@ -539,6 +683,7 @@ impl Codegen {
     fn ensure_string(&mut self, val: String, kind: VarKind) -> String {
         match kind {
             VarKind::String => val,
+            VarKind::Struct => val, // best-effort
             VarKind::Number => {
                 let buf = self.fresh();
                 let _ = writeln!(self.body, "  {} = call ptr @malloc(i64 32)", buf);

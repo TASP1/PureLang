@@ -22,6 +22,8 @@ pub struct TypeChecker {
     scopes: Vec<Scope>,
     /// Top-level functions
     functions: HashMap<String, Type>,
+    /// Struct name → field names (order matters)
+    structs: HashMap<String, Vec<String>>,
     errors: Vec<TypeError>,
 }
 
@@ -32,22 +34,29 @@ impl TypeChecker {
                 vars: HashMap::new(),
             }],
             functions: HashMap::new(),
+            structs: HashMap::new(),
             errors: Vec::new(),
         }
     }
 
     pub fn check_program(&mut self, program: &Program) -> Result<(), Vec<TypeError>> {
-        // First pass: register function signatures (params typed as Unknown for now)
+        // First pass: register structs and function signatures
         for item in &program.items {
-            if let Item::Function { name, params, .. } = item {
-                let param_tys = params.iter().map(|_| Type::Unknown).collect();
-                self.functions.insert(
-                    name.clone(),
-                    Type::Function {
-                        params: param_tys,
-                        ret: Box::new(Type::Void),
-                    },
-                );
+            match item {
+                Item::Struct { name, fields } => {
+                    self.structs.insert(name.clone(), fields.clone());
+                }
+                Item::Function { name, params, body } => {
+                    let param_tys: Vec<Type> = params.iter().map(|_| Type::Number).collect();
+                    let ret = Self::infer_return_type(body);
+                    self.functions.insert(
+                        name.clone(),
+                        Type::Function {
+                            params: param_tys,
+                            ret: Box::new(ret),
+                        },
+                    );
+                }
             }
         }
 
@@ -108,6 +117,61 @@ impl TypeChecker {
         }
     }
 
+    fn infer_return_type(body: &Block) -> Type {
+        fn from_block(block: &Block) -> Type {
+            let mut found = Type::Void;
+            for stmt in &block.statements {
+                match stmt {
+                    Stmt::Return(Some(expr)) => {
+                        found = expr_ty_hint(expr);
+                    }
+                    Stmt::If {
+                        then_block,
+                        else_block,
+                        ..
+                    } => {
+                        let t = from_block(then_block);
+                        if t != Type::Void {
+                            found = t;
+                        }
+                        if let Some(eb) = else_block {
+                            let t = from_block(eb);
+                            if t != Type::Void {
+                                found = t;
+                            }
+                        }
+                    }
+                    Stmt::For { body, .. } => {
+                        let t = from_block(body);
+                        if t != Type::Void {
+                            found = t;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            found
+        }
+        fn expr_ty_hint(expr: &Expr) -> Type {
+            match expr {
+                Expr::Number(_) => Type::Number,
+                Expr::String(_) => Type::String,
+                Expr::Bool(_) => Type::Bool,
+                Expr::Binary { op, .. } => match op {
+                    BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => Type::Number,
+                    BinaryOp::Eq
+                    | BinaryOp::NotEq
+                    | BinaryOp::Lt
+                    | BinaryOp::Gt
+                    | BinaryOp::LtEq
+                    | BinaryOp::GtEq => Type::Bool,
+                },
+                _ => Type::Number,
+            }
+        }
+        from_block(body)
+    }
+
     fn check_item(&mut self, item: &Item) {
         match item {
             Item::Function {
@@ -117,8 +181,8 @@ impl TypeChecker {
             } => {
                 self.push_scope();
                 for p in params {
-                    // Parameters are immutable by default, type unknown until annotations exist
-                    self.declare(p, Type::Unknown, false);
+                    // Parameters are immutable by default; Phase 2: numeric by default
+                    self.declare(p, Type::Number, false);
                 }
                 self.check_block(body);
                 self.pop_scope();
@@ -302,12 +366,25 @@ impl TypeChecker {
             }
             Expr::Field { object, field } => {
                 let obj_ty = self.check_expr(object);
-                // Minimal field support; expand when structs are typed
-                match (&obj_ty, field.as_str()) {
-                    (Type::String, "length") | (Type::List(_), "length") => Type::Number,
-                    (Type::Unknown, _) => Type::Unknown,
-                    _ => {
-                        self.error(format!("Type {} has no field '{}'", obj_ty, field));
+                match &obj_ty {
+                    Type::String if field == "length" => Type::Number,
+                    Type::List(_) if field == "length" => Type::Number,
+                    Type::Struct(sname) => {
+                        if let Some(fields) = self.structs.get(sname) {
+                            if fields.iter().any(|f| f == field) {
+                                Type::Number
+                            } else {
+                                self.error(format!("Struct '{}' has no field '{}'", sname, field));
+                                Type::Unknown
+                            }
+                        } else {
+                            self.error(format!("Unknown struct type '{}'", sname));
+                            Type::Unknown
+                        }
+                    }
+                    Type::Unknown => Type::Unknown,
+                    other => {
+                        self.error(format!("Type {} has no field '{}'", other, field));
                         Type::Unknown
                     }
                 }
@@ -419,19 +496,49 @@ impl TypeChecker {
     }
 
     fn check_call(&mut self, callee: &Expr, args: &[Expr]) -> Type {
+        // Struct construction: Point(10, 20)
+        if let Expr::Ident(name) = callee
+            && let Some(fields) = self.structs.get(name).cloned()
+        {
+            if args.len() != fields.len() {
+                self.error(format!(
+                    "Struct '{}' expects {} fields, found {}",
+                    name,
+                    fields.len(),
+                    args.len()
+                ));
+            }
+            for a in args {
+                let t = self.check_expr(a);
+                if t != Type::Number && t != Type::Unknown {
+                    self.error(format!(
+                        "Struct field initializer must be Number, found {}",
+                        t
+                    ));
+                }
+            }
+            return Type::Struct(name.clone());
+        }
+
         let callee_ty = self.check_expr(callee);
         let arg_tys: Vec<Type> = args.iter().map(|a| self.check_expr(a)).collect();
 
         match callee_ty {
             Type::Function { params, ret } => {
-                if params.len() != arg_tys.len() && !params.is_empty() {
-                    // Allow unknown arity when params are all Unknown
-                    let all_unknown = params.iter().all(|p| *p == Type::Unknown);
-                    if !all_unknown {
+                if params.len() != arg_tys.len() {
+                    self.error(format!(
+                        "Function expects {} arguments, found {}",
+                        params.len(),
+                        arg_tys.len()
+                    ));
+                }
+                for (i, (p, a)) in params.iter().zip(arg_tys.iter()).enumerate() {
+                    if *p != Type::Unknown && *a != Type::Unknown && p != a {
                         self.error(format!(
-                            "Function expects {} arguments, found {}",
-                            params.len(),
-                            arg_tys.len()
+                            "Argument {} type mismatch: expected {}, found {}",
+                            i + 1,
+                            p,
+                            a
                         ));
                     }
                 }

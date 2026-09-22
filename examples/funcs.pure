@@ -1,0 +1,15 @@
+// Function calls + return values
+
+fn add(a, b) {
+    return a + b
+}
+
+fn double(x) {
+    return x * 2
+}
+
+fn main() {
+    s = add(10, 32)
+    print s
+    print double(21)
+}

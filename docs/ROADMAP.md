@@ -27,13 +27,15 @@
 
 ## Phase 2 — Core Language Features
 
-- Full ownership & borrow checker
-- Structs, methods, enums
-- Pattern matching
-- Generics / traits
-- Error handling with `?`
-- Modules and visibility
-- Ranges, lists, basic collections
+- [x] User-defined functions + calls + return values
+- [x] Structs (declaration, construction, field access)
+- [ ] Full ownership & borrow checker
+- [ ] Methods, enums
+- [ ] Pattern matching
+- [ ] Generics / traits
+- [ ] Error handling with `?`
+- [ ] Modules and visibility
+- [ ] Lists as first-class runtime values
 
 ## Phase 3 — Performance & Platforms
 

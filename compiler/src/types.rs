@@ -11,7 +11,9 @@ pub enum Type {
     Range,
     /// Homogeneous list
     List(Box<Type>),
-    /// Function type (params -> return). Return is Void for now when unknown.
+    /// Named struct type
+    Struct(String),
+    /// Function type (params -> return)
     Function {
         params: Vec<Type>,
         ret: Box<Type>,
@@ -24,7 +26,10 @@ pub enum Type {
 
 impl Type {
     pub fn is_copy(&self) -> bool {
-        matches!(self, Type::Number | Type::Bool | Type::Range | Type::Void)
+        matches!(
+            self,
+            Type::Number | Type::Bool | Type::Range | Type::Void | Type::Struct(_)
+        )
     }
 
     #[allow(dead_code)]
@@ -46,6 +51,7 @@ impl fmt::Display for Type {
             Type::Bool => write!(f, "Bool"),
             Type::Range => write!(f, "Range"),
             Type::List(inner) => write!(f, "List<{inner}>"),
+            Type::Struct(name) => write!(f, "{name}"),
             Type::Function { params, ret } => {
                 let ps: Vec<String> = params.iter().map(|p| p.to_string()).collect();
                 write!(f, "fn({}) -> {}", ps.join(", "), ret)
@@ -62,7 +68,7 @@ pub struct TypeError {
 }
 
 impl fmt::Display for TypeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Type error: {}", self.message)
     }
 }

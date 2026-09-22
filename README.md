@@ -38,6 +38,8 @@ fn main() {
 - [x] **Type & Ownership checker**
 - [x] **LLVM code generation** (native binaries!)
 - [x] **WebAssembly target** (WASI .wat)
+- [x] **Functions + calls**
+- [x] **Structs** (construct + fields)
 
 ## Project Structure
 
