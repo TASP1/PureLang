@@ -8,7 +8,7 @@
 - [x] **Parser + AST implemented**
 - [x] **Type checker + Ownership analysis**
 - [x] **LLVM IR code generation**
-- [ ] WebAssembly backend
+- [x] **WebAssembly backend**
 - [ ] Standard library
 
 ## Phase 1 — Minimal Viable Compiler (In Progress)
@@ -21,7 +21,7 @@
 - [x] Simple ownership tracking
 - [x] LLVM IR emission for a tiny subset
 - [x] First native executable (`purec --compile -o hello hello.pure`)
-- [ ] First WebAssembly module
+- [x] First WebAssembly module (WASI .wat via --emit-wasm)
 
 **Milestone**: Hello World + simple game loop running natively.
 

@@ -82,6 +82,13 @@ jobs:
           echo "=== game_loop ==="
           /tmp/game_loop
 
+      - name: Emit WebAssembly
+        run: |
+          cargo run --release -- --emit-wasm -o /tmp/hello.wat ../examples/hello.pure
+          cargo run --release -- --emit-wasm -o /tmp/game_loop.wat ../examples/game_loop.pure
+          echo "WASM modules generated"
+          wc -l /tmp/hello.wat /tmp/game_loop.wat
+
       - name: Upload purec binary
         uses: actions/upload-artifact@v7
         with:

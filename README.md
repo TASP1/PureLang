@@ -37,7 +37,7 @@ fn main() {
 - [x] **Parser + AST complete**
 - [x] **Type & Ownership checker**
 - [x] **LLVM code generation** (native binaries!)
-- [ ] WebAssembly target
+- [x] **WebAssembly target** (WASI .wat)
 
 ## Project Structure
 
@@ -52,7 +52,8 @@ PureLang/
 │       ├── parser.rs
 │       ├── types.rs
 │       ├── checker.rs
-│       └── codegen.rs
+│       ├── codegen.rs
+│       └── wasm.rs
 ├── docs/               # Full design documentation
 │   ├── ARCHITECTURE.md
 │   ├── SYNTAX.md
@@ -84,6 +85,10 @@ cargo run --release -- --compile -o game ../examples/game_loop.pure
 
 # Emit LLVM IR only
 cargo run --release -- --emit-ir ../examples/hello.pure
+
+# Emit WebAssembly (WASI)
+cargo run --release -- --emit-wasm ../examples/hello.pure
+wasmtime hello.wat
 ```
 
 ## Documentation

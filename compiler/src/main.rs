@@ -7,6 +7,7 @@ mod lexer;
 mod parser;
 mod token;
 mod types;
+mod wasm;
 
 use std::env;
 use std::fs;
@@ -28,7 +29,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.4.0 (PureLang compiler - lexer + parser + typecheck + llvm)");
+        println!("purec 0.5.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
         return;
     }
 
@@ -67,6 +68,13 @@ fn main() {
             }
             "--compile" | "-c" => {
                 mode = "compile";
+            }
+            "--emit-wasm" => {
+                mode = "wasm";
+                i += 1;
+                if i < args.len() && !args[i].starts_with('-') {
+                    filename = Some(&args[i]);
+                }
             }
             s if s.starts_with('-') => {
                 eprintln!("Unknown option: {}", s);
@@ -151,7 +159,44 @@ fn main() {
         return;
     }
 
-    // Codegen
+    if mode == "wasm" {
+        let mut wg = wasm::WasmCodegen::new();
+        match wg.generate(&program) {
+            Ok(wat) => {
+                if let Some(out) = output {
+                    fs::write(out, &wat).unwrap_or_else(|e| {
+                        eprintln!("Failed to write {}: {}", out, e);
+                        process::exit(1);
+                    });
+                    println!("Wrote WebAssembly to {}", out);
+                } else {
+                    let base = Path::new(filename)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("out");
+                    let wat_path = format!("{}.wat", base);
+                    fs::write(&wat_path, &wat).unwrap_or_else(|e| {
+                        eprintln!("Failed to write {}: {}", wat_path, e);
+                        process::exit(1);
+                    });
+                    println!("=== PureLang WASM ===");
+                    println!("File: {}", filename);
+                    println!("Type check passed ✓");
+                    println!("WebAssembly → {}", wat_path);
+                    println!("Run with: wasmtime {}", wat_path);
+                }
+            }
+            Err(errors) => {
+                for e in errors {
+                    eprintln!("WASM error: {}", e);
+                }
+                process::exit(1);
+            }
+        }
+        return;
+    }
+
+    // LLVM Codegen
     let mut cg = Codegen::new();
     let ir = match cg.generate(&program) {
         Ok(ir) => ir,
@@ -216,13 +261,14 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.4.0");
+    eprintln!("PureLang Compiler (purec) v0.5.0");
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  purec <file.pure>              Type-check");
     eprintln!("  purec --compile <file.pure>    Compile to native binary");
     eprintln!("  purec -o <out> <file.pure>     Compile to named binary");
     eprintln!("  purec --emit-ir <file.pure>    Print LLVM IR");
+    eprintln!("  purec --emit-wasm <file.pure>  Emit WebAssembly (.wat)");
     eprintln!("  purec --ast <file.pure>        Show AST");
     eprintln!("  purec --tokens <file.pure>     Show tokens");
     eprintln!("  purec --version");

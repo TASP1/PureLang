@@ -4,7 +4,7 @@
 
 The PureLang compiler is called **`purec`**.
 
-It is written in Rust and currently at **Phase 1 (Lexer + Parser + Type Checker + LLVM Codegen)**.
+It is written in Rust and currently at **Phase 1 complete (Lexer + Parser + Type Checker + LLVM + WASM)**.
 
 ## Current Implementation
 
@@ -19,7 +19,8 @@ compiler/
 │   ├── parser.rs    # Recursive-descent parser
 │   ├── types.rs     # Type system
 │   ├── checker.rs   # Type checker + ownership analysis
-│   └── codegen.rs   # LLVM IR text emitter → clang
+│   ├── codegen.rs   # LLVM IR text emitter → clang
+│   └── wasm.rs      # WebAssembly Text (WASI) emitter
 ```
 
 ### What works today
@@ -38,7 +39,7 @@ The lexer tokenizes source, the parser builds a full AST, and the type checker e
 2. **Parsing** → Abstract Syntax Tree (AST) ← (completed)
 3. **Type Checking + Ownership Analysis** ← (completed)
 4. **LLVM IR Code Generation** ← (completed)
-5. **WebAssembly backend**
+5. **WebAssembly backend** ← (completed)
 6. **Richer stdlib / optimizations**
 
 ## Technology Choices
@@ -64,4 +65,4 @@ Errors should be:
 
 ## Next Immediate Step
 
-Implement **WebAssembly backend** and expand codegen coverage.
+Expand language features (structs, calls) and stdlib.
