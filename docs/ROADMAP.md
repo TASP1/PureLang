@@ -6,7 +6,7 @@
 - [x] Core design documents
 - [x] **Lexer implemented**
 - [x] **Parser + AST implemented**
-- [ ] Type checker + Ownership analysis
+- [x] **Type checker + Ownership analysis**
 - [ ] LLVM IR code generation
 - [ ] WebAssembly backend
 - [ ] Standard library
@@ -17,8 +17,8 @@
 
 - [x] Lexer for the easy PureLang syntax
 - [x] Parser → Abstract Syntax Tree (AST)
-- [ ] Basic type checking
-- [ ] Simple ownership tracking
+- [x] Basic type checking
+- [x] Simple ownership tracking
 - [ ] LLVM IR emission for a tiny subset
 - [ ] First native executable (`purec hello.pure -o hello`)
 - [ ] First WebAssembly module

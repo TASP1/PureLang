@@ -1,15 +1,18 @@
-//! PureLang Compiler (purec) - Phase 1: Lexer + Parser
+//! PureLang Compiler (purec) - Phase 1: Lexer + Parser + Type Checker
 
 mod ast;
+mod checker;
 mod lexer;
 mod parser;
 mod token;
+mod types;
 
 use std::env;
 use std::fs;
 use std::process;
 
 use ast::*;
+use checker::TypeChecker;
 use lexer::Lexer;
 use parser::Parser;
 
@@ -17,11 +20,12 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("PureLang Compiler (purec) v0.2.0");
+        eprintln!("PureLang Compiler (purec) v0.3.0");
         eprintln!();
         eprintln!("Usage:");
-        eprintln!("  purec <file.pure>          Parse a PureLang source file");
+        eprintln!("  purec <file.pure>          Parse + type-check a PureLang source file");
         eprintln!("  purec --tokens <file>      Show tokens only");
+        eprintln!("  purec --ast <file>         Show AST only (skip type check)");
         eprintln!("  purec --version            Show version");
         eprintln!();
         eprintln!("Example:");
@@ -30,19 +34,26 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.2.0 (PureLang compiler - lexer + parser)");
+        println!("purec 0.3.0 (PureLang compiler - lexer + parser + type checker)");
         return;
     }
 
-    let tokens_only = args[1] == "--tokens";
-    let filename = if tokens_only {
-        if args.len() < 3 {
-            eprintln!("Error: --tokens requires a file path");
-            process::exit(1);
+    let (mode, filename) = match args[1].as_str() {
+        "--tokens" => {
+            if args.len() < 3 {
+                eprintln!("Error: --tokens requires a file path");
+                process::exit(1);
+            }
+            ("tokens", &args[2])
         }
-        &args[2]
-    } else {
-        &args[1]
+        "--ast" => {
+            if args.len() < 3 {
+                eprintln!("Error: --ast requires a file path");
+                process::exit(1);
+            }
+            ("ast", &args[2])
+        }
+        _ => ("check", &args[1]),
     };
 
     let source = match fs::read_to_string(filename) {
@@ -57,7 +68,7 @@ fn main() {
     let mut lexer = Lexer::new(&source);
     let tokens = lexer.tokenize();
 
-    if tokens_only {
+    if mode == "tokens" {
         println!("=== PureLang Tokens ===");
         println!("File: {}", filename);
         println!("----------------------");
@@ -74,25 +85,49 @@ fn main() {
     }
 
     // Parse
-    println!("=== PureLang Parser ===");
+    let mut parser = Parser::new(tokens);
+    let program = match parser.parse_program() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
+
+    if mode == "ast" {
+        println!("=== PureLang AST ===");
+        println!("File: {}", filename);
+        println!("----------------------");
+        print_program(&program, 0);
+        println!("----------------------");
+        println!("Parse successful ✓");
+        return;
+    }
+
+    // Type check
+    println!("=== PureLang Type Checker ===");
     println!("File: {}", filename);
     println!("----------------------");
 
-    let mut parser = Parser::new(tokens);
-    match parser.parse_program() {
-        Ok(program) => {
-            print_program(&program, 0);
+    let mut checker = TypeChecker::new();
+    match checker.check_program(&program) {
+        Ok(()) => {
+            println!("Type check passed ✓");
             println!("----------------------");
-            println!("Parse successful ✓");
+            println!("No type or ownership errors.");
         }
-        Err(e) => {
-            eprintln!("{}", e);
+        Err(errors) => {
+            for err in &errors {
+                eprintln!("{}", err);
+            }
+            eprintln!("----------------------");
+            eprintln!("{} error(s) found", errors.len());
             process::exit(1);
         }
     }
 }
 
-// ---------- Pretty printer ----------
+// ---------- Pretty printer (used by --ast) ----------
 
 fn indent(level: usize) -> String {
     "  ".repeat(level)
@@ -170,9 +205,7 @@ fn print_stmt(stmt: &Stmt, level: usize) {
             print_expr(iterable, level + 1);
             print_block(body, level + 1);
         }
-        Stmt::Return(None) => {
-            println!("{}Return", indent(level));
-        }
+        Stmt::Return(None) => println!("{}Return", indent(level)),
         Stmt::Return(Some(expr)) => {
             println!("{}Return", indent(level));
             print_expr(expr, level + 1);

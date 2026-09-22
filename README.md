@@ -34,8 +34,8 @@ fn main() {
 
 - [x] Public repository & design documents
 - [x] **Lexer complete**
-- [x] **Parser + AST complete** (Phase 1)
-- [ ] Type & Ownership checker
+- [x] **Parser + AST complete**
+- [x] **Type & Ownership checker** (Phase 1)
 - [ ] LLVM code generation
 - [ ] WebAssembly target
 
@@ -49,7 +49,9 @@ PureLang/
 │       ├── lexer.rs
 │       ├── token.rs
 │       ├── ast.rs
-│       └── parser.rs
+│       ├── parser.rs
+│       ├── types.rs
+│       └── checker.rs
 ├── docs/               # Full design documentation
 │   ├── ARCHITECTURE.md
 │   ├── SYNTAX.md
@@ -63,13 +65,16 @@ PureLang/
 └── CONTRIBUTING.md
 ```
 
-## Try the Parser
+## Try the Type Checker
 
 ```bash
 cd compiler
 cargo build --release
 cargo run --release -- ../examples/hello.pure
 cargo run --release -- ../examples/game_loop.pure
+
+# AST only (skip type check):
+cargo run --release -- --ast ../examples/hello.pure
 
 # Tokens only:
 cargo run --release -- --tokens ../examples/hello.pure
