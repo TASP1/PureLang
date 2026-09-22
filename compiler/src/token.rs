@@ -25,26 +25,26 @@ pub enum Token {
     Minus,
     Star,
     Slash,
-    Assign,      // =
-    Equal,       // ==
-    NotEqual,    // !=
-    Less,        // <
-    Greater,     // >
-    LessEqual,   // <=
-    GreaterEqual,// >=
-    DotDot,      // ..
-    Dot,         // .
+    Assign,       // =
+    Equal,        // ==
+    NotEqual,     // !=
+    Less,         // <
+    Greater,      // >
+    LessEqual,    // <=
+    GreaterEqual, // >=
+    DotDot,       // ..
+    Dot,          // .
     Comma,
     Colon,
-    Question,    // ?
+    Question, // ?
 
     // Delimiters
-    LParen,      // (
-    RParen,      // )
-    LBrace,      // {
-    RBrace,      // }
-    LBracket,    // [
-    RBracket,    // ]
+    LParen,   // (
+    RParen,   // )
+    LBrace,   // {
+    RBrace,   // }
+    LBracket, // [
+    RBracket, // ]
 
     // Special
     Newline,

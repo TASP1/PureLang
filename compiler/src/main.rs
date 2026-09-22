@@ -1,7 +1,7 @@
 //! PureLang Compiler (purec) - Phase 1: Lexer
 
-mod token;
 mod lexer;
+mod token;
 
 use std::env;
 use std::fs;
