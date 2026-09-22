@@ -33,8 +33,8 @@ fn main() {
 ## Current Status
 
 - [x] Public repository & design documents
-- [x] **Lexer complete** (Phase 1)
-- [ ] Parser + AST
+- [x] **Lexer complete**
+- [x] **Parser + AST complete** (Phase 1)
 - [ ] Type & Ownership checker
 - [ ] LLVM code generation
 - [ ] WebAssembly target
@@ -47,7 +47,9 @@ PureLang/
 │   └── src/
 │       ├── main.rs
 │       ├── lexer.rs
-│       └── token.rs
+│       ├── token.rs
+│       ├── ast.rs
+│       └── parser.rs
 ├── docs/               # Full design documentation
 │   ├── ARCHITECTURE.md
 │   ├── SYNTAX.md
@@ -61,13 +63,16 @@ PureLang/
 └── CONTRIBUTING.md
 ```
 
-## Try the Lexer
+## Try the Parser
 
 ```bash
 cd compiler
-cargo build
-cargo run -- ../examples/hello.pure
-cargo run -- ../examples/game_loop.pure
+cargo build --release
+cargo run --release -- ../examples/hello.pure
+cargo run --release -- ../examples/game_loop.pure
+
+# Tokens only:
+cargo run --release -- --tokens ../examples/hello.pure
 ```
 
 ## Documentation

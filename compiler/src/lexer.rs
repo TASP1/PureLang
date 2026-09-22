@@ -37,11 +37,29 @@ impl Lexer {
 
     fn read_number(&mut self) -> Token {
         let start = self.position;
+        // Integer part
         while let Some(ch) = self.peek() {
-            if ch.is_ascii_digit() || ch == '.' {
+            if ch.is_ascii_digit() {
                 self.advance();
             } else {
                 break;
+            }
+        }
+        // Optional fractional part — only a single '.' followed by digits.
+        // Do NOT consume ".." (range operator).
+        if self.peek() == Some('.') {
+            let next = self.input.get(self.position + 1).copied();
+            if next == Some('.') {
+                // It's the start of a range operator — leave the dots alone.
+            } else if next.map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                self.advance(); // consume '.'
+                while let Some(ch) = self.peek() {
+                    if ch.is_ascii_digit() {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
             }
         }
         let number_str: String = self.input[start..self.position].iter().collect();

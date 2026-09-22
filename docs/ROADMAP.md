@@ -4,8 +4,8 @@
 
 - [x] Project initialized & public repository
 - [x] Core design documents
-- [x] **Lexer implemented** (Phase 1 complete)
-- [ ] Parser + AST
+- [x] **Lexer implemented**
+- [x] **Parser + AST implemented**
 - [ ] Type checker + Ownership analysis
 - [ ] LLVM IR code generation
 - [ ] WebAssembly backend
@@ -16,7 +16,7 @@
 **Goal**: Tokenize → Parse → Generate simple native code
 
 - [x] Lexer for the easy PureLang syntax
-- [ ] Parser → Abstract Syntax Tree (AST)
+- [x] Parser → Abstract Syntax Tree (AST)
 - [ ] Basic type checking
 - [ ] Simple ownership tracking
 - [ ] LLVM IR emission for a tiny subset

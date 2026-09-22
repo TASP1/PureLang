@@ -4,7 +4,7 @@
 
 The PureLang compiler is called **`purec`**.
 
-It is written in Rust and currently at **Phase 1 (Lexer)**.
+It is written in Rust and currently at **Phase 1 (Lexer + Parser)**.
 
 ## Current Implementation
 
@@ -14,7 +14,9 @@ compiler/
 ├── src/
 │   ├── main.rs      # CLI entry point
 │   ├── token.rs     # Token definitions
-│   └── lexer.rs     # Lexer implementation
+│   ├── lexer.rs     # Lexer implementation
+│   ├── ast.rs       # Abstract Syntax Tree
+│   └── parser.rs    # Recursive-descent parser
 ```
 
 ### What works today
@@ -25,12 +27,12 @@ cargo build
 cargo run -- ../examples/hello.pure
 ```
 
-The lexer successfully tokenizes PureLang source files using the easy syntax.
+The lexer tokenizes PureLang source files and the parser builds a full AST for the current syntax (functions, lets, if/for, expressions, ranges).
 
 ## Planned Pipeline Stages
 
 1. **Lexing** ← (completed)
-2. **Parsing** → Abstract Syntax Tree (AST)
+2. **Parsing** → Abstract Syntax Tree (AST) ← (completed)
 3. **Name Resolution**
 4. **Type Checking + Ownership Analysis**
 5. **IR Generation**
@@ -61,4 +63,4 @@ Errors should be:
 
 ## Next Immediate Step
 
-Implement the **Parser** that turns the token stream into an Abstract Syntax Tree.
+Implement the **Type checker + Ownership analysis** stage.
