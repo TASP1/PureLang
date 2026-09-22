@@ -7,12 +7,18 @@ on:
     branches: [ master, main ]
   workflow_dispatch:
 
+# Always use the newest GitHub-hosted environment
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
 jobs:
   docs:
     name: Check Documentation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # tracks newest Ubuntu (currently 24.04 → 26.04 soon)
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v7
 
       - name: Check Markdown files exist
         run: |
@@ -34,22 +40,34 @@ jobs:
 
   build:
     name: Build Compiler (purec)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # always latest stable GitHub runner image
     defaults:
       run:
         working-directory: compiler
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v7
 
-      - name: Install Rust toolchain
+      - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          # Explicitly request the absolute latest stable channel
+
+      - name: Show toolchain versions
+        run: |
+          rustc --version --verbose
+          cargo --version
+          rustfmt --version
+          clippy-driver --version
+          echo "Runner OS: $RUNNER_OS"
+          echo "Image OS: $(cat /etc/os-release | grep PRETTY_NAME)"
 
       - name: Cache cargo registry & build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: compiler
+          # Keep cache keys current with latest toolchain
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -69,8 +87,9 @@ jobs:
           cargo run --release -- ../examples/game_loop.pure
 
       - name: Upload purec binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: purec-${{ runner.os }}
+          name: purec-${{ runner.os }}-${{ runner.arch }}
           path: compiler/target/release/purec
           if-no-files-found: error
+          retention-days: 14
