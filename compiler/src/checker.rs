@@ -351,23 +351,19 @@ impl TypeChecker {
         match op {
             BinaryOp::Add => {
                 // Number + Number → Number
-                // String + String → String
-                // String + Number / Number + String → String (convenience)
-                if l == Type::Number && r == Type::Number {
-                    Type::Number
-                } else if l == Type::String && r == Type::String {
-                    Type::String
-                } else if (l == Type::String && r == Type::Number)
-                    || (l == Type::Number && r == Type::String)
-                    || (l == Type::String && r == Type::Unknown)
-                    || (l == Type::Unknown && r == Type::String)
-                {
-                    Type::String
-                } else if l == Type::Unknown || r == Type::Unknown {
-                    Type::Unknown
-                } else {
-                    self.error(format!("Cannot apply '+' to {} and {}", l, r));
-                    Type::Unknown
+                // Any involvement of String → String (convenience concat)
+                match (&l, &r) {
+                    (Type::Number, Type::Number) => Type::Number,
+                    (Type::String, Type::String)
+                    | (Type::String, Type::Number)
+                    | (Type::Number, Type::String)
+                    | (Type::String, Type::Unknown)
+                    | (Type::Unknown, Type::String) => Type::String,
+                    (Type::Unknown, _) | (_, Type::Unknown) => Type::Unknown,
+                    _ => {
+                        self.error(format!("Cannot apply '+' to {} and {}", l, r));
+                        Type::Unknown
+                    }
                 }
             }
             BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
