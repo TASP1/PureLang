@@ -271,7 +271,21 @@ impl Codegen {
         self.preamble.push_str("declare i64 @strlen(ptr)\n");
         self.preamble
             .push_str("declare i32 @snprintf(ptr, i64, ptr, ...)\n");
-        self.preamble.push_str("declare void @free(ptr)\n\n");
+        self.preamble.push_str("declare void @free(ptr)\n");
+        // libm (linked via clang -lm)
+        self.preamble.push_str("declare double @fabs(double)\n");
+        self.preamble.push_str("declare double @fmin(double, double)\n");
+        self.preamble.push_str("declare double @fmax(double, double)\n");
+        self.preamble.push_str("declare double @pow(double, double)\n");
+        self.preamble.push_str("declare double @sqrt(double)\n");
+        self.preamble.push_str("declare double @floor(double)\n");
+        self.preamble.push_str("declare double @ceil(double)\n");
+        self.preamble.push_str("declare double @round(double)\n");
+        self.preamble.push_str("declare double @sin(double)\n");
+        self.preamble.push_str("declare double @cos(double)\n");
+        self.preamble.push_str("declare double @tan(double)\n");
+        self.preamble.push_str("declare double @log(double)\n");
+        self.preamble.push_str("declare double @exp(double)\n\n");
         self.preamble.push_str(
             "@.fmt_str = private unnamed_addr constant [4 x i8] c\"%s\\0A\\00\", align 1\n",
         );
@@ -948,6 +962,69 @@ impl Codegen {
             Expr::Call { callee, args } => {
                 // Struct construction or function call
                 if let Expr::Ident(name) = callee.as_ref() {
+                    // Built-in math (stdlib) — always available
+                    let builtin = name.strip_prefix("std_").unwrap_or(name.as_str());
+                    let is_math = matches!(
+                        builtin,
+                        "abs" | "min" | "max" | "pow" | "sqrt" | "floor" | "ceil"
+                            | "round" | "sin" | "cos" | "tan" | "log" | "exp"
+                    );
+                    if is_math {
+                        let mut fargs = Vec::new();
+                        for a in args {
+                            let (v, _) = self.emit_expr(a);
+                            let d = self.fresh();
+                            let _ = writeln!(
+                                self.body,
+                                "  {} = sitofp i64 {} to double",
+                                d, v
+                            );
+                            fargs.push(d);
+                        }
+                        let (c_name, nargs) = match builtin {
+                            "abs" => ("fabs", 1usize),
+                            "min" => ("fmin", 2),
+                            "max" => ("fmax", 2),
+                            "pow" => ("pow", 2),
+                            "sqrt" => ("sqrt", 1),
+                            "floor" => ("floor", 1),
+                            "ceil" => ("ceil", 1),
+                            "round" => ("round", 1),
+                            "sin" => ("sin", 1),
+                            "cos" => ("cos", 1),
+                            "tan" => ("tan", 1),
+                            "log" => ("log", 1),
+                            "exp" => ("exp", 1),
+                            _ => ("fabs", 1),
+                        };
+                        if fargs.len() != nargs {
+                            self.errors.push(format!(
+                                "codegen: {} expects {} args, found {}",
+                                builtin,
+                                nargs,
+                                fargs.len()
+                            ));
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let args_ir = fargs
+                            .iter()
+                            .map(|a| format!("double {}", a))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let fd = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call double @{}({})",
+                            fd, c_name, args_ir
+                        );
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = fptosi double {} to i64",
+                            res, fd
+                        );
+                        return (res, VarKind::Number);
+                    }
                     if let Some(fields) = self.structs.get(name).cloned() {
                         // alloca struct, store fields
                         let ptr = self.fresh();
@@ -966,6 +1043,67 @@ impl Codegen {
                         return (ptr, VarKind::Struct);
                     }
                     if self.functions.contains_key(name) {
+                        // Built-in math stdlib → libm (values are i64, convert via sitofp/fptosi)
+                        let builtin = name.strip_prefix("std_").unwrap_or(name);
+                        let is_math = matches!(
+                            builtin,
+                            "abs" | "min" | "max" | "pow" | "sqrt" | "floor" | "ceil"
+                                | "round" | "sin" | "cos" | "tan" | "log" | "exp"
+                        );
+                        if is_math {
+                            let mut fargs = Vec::new();
+                            for a in args {
+                                let (v, _) = self.emit_expr(a);
+                                let d = self.fresh();
+                                let _ = writeln!(
+                                    self.body,
+                                    "  {} = sitofp i64 {} to double",
+                                    d, v
+                                );
+                                fargs.push(d);
+                            }
+                            let (c_name, nargs) = match builtin {
+                                "abs" => ("fabs", 1),
+                                "min" => ("fmin", 2),
+                                "max" => ("fmax", 2),
+                                "pow" => ("pow", 2),
+                                "sqrt" => ("sqrt", 1),
+                                "floor" => ("floor", 1),
+                                "ceil" => ("ceil", 1),
+                                "round" => ("round", 1),
+                                "sin" => ("sin", 1),
+                                "cos" => ("cos", 1),
+                                "tan" => ("tan", 1),
+                                "log" => ("log", 1),
+                                "exp" => ("exp", 1),
+                                _ => ("fabs", 1),
+                            };
+                            if fargs.len() != nargs {
+                                self.errors.push(format!(
+                                    "codegen: {} expects {} args",
+                                    builtin, nargs
+                                ));
+                                return ("0".into(), VarKind::Number);
+                            }
+                            let args_ir = fargs
+                                .iter()
+                                .map(|a| format!("double {}", a))
+                                .collect::<Vec<_>>()
+                                .join(", ");
+                            let fd = self.fresh();
+                            let _ = writeln!(
+                                self.body,
+                                "  {} = call double @{}({})",
+                                fd, c_name, args_ir
+                            );
+                            let res = self.fresh();
+                            let _ = writeln!(
+                                self.body,
+                                "  {} = fptosi double {} to i64",
+                                res, fd
+                            );
+                            return (res, VarKind::Number);
+                        }
                         let is_ptrs = self
                             .function_param_is_ptr
                             .get(name)
@@ -993,10 +1131,67 @@ impl Codegen {
                         return (res, VarKind::Number);
                     }
                 }
-                // Module path: math.add(...) → @math_add(...)
+                // Module path: math.add(...) → @math_add(...)  OR std.sqrt → libm
                 if let Expr::Field { object, field } = callee.as_ref() {
                     if let Expr::Ident(mod_name) = object.as_ref() {
                         let full = format!("{}_{}", mod_name, field);
+                        // std.* math builtins
+                        if mod_name == "std" {
+                            let builtin = field.as_str();
+                            let is_math = matches!(
+                                builtin,
+                                "abs" | "min" | "max" | "pow" | "sqrt" | "floor" | "ceil"
+                                    | "round" | "sin" | "cos" | "tan" | "log" | "exp"
+                            );
+                            if is_math {
+                                // reuse by synthesizing Ident call path via recursive pattern
+                                let mut fargs = Vec::new();
+                                for a in args {
+                                    let (v, _) = self.emit_expr(a);
+                                    let d = self.fresh();
+                                    let _ = writeln!(
+                                        self.body,
+                                        "  {} = sitofp i64 {} to double",
+                                        d, v
+                                    );
+                                    fargs.push(d);
+                                }
+                                let (c_name, nargs) = match builtin {
+                                    "abs" => ("fabs", 1usize),
+                                    "min" => ("fmin", 2),
+                                    "max" => ("fmax", 2),
+                                    "pow" => ("pow", 2),
+                                    "sqrt" => ("sqrt", 1),
+                                    "floor" => ("floor", 1),
+                                    "ceil" => ("ceil", 1),
+                                    "round" => ("round", 1),
+                                    "sin" => ("sin", 1),
+                                    "cos" => ("cos", 1),
+                                    "tan" => ("tan", 1),
+                                    "log" => ("log", 1),
+                                    "exp" => ("exp", 1),
+                                    _ => ("fabs", 1),
+                                };
+                                let args_ir = fargs
+                                    .iter()
+                                    .map(|a| format!("double {}", a))
+                                    .collect::<Vec<_>>()
+                                    .join(", ");
+                                let fd = self.fresh();
+                                let _ = writeln!(
+                                    self.body,
+                                    "  {} = call double @{}({})",
+                                    fd, c_name, args_ir
+                                );
+                                let res = self.fresh();
+                                let _ = writeln!(
+                                    self.body,
+                                    "  {} = fptosi double {} to i64",
+                                    res, fd
+                                );
+                                return (res, VarKind::Number);
+                            }
+                        }
                         if self.functions.contains_key(&full) {
                             let is_ptrs = self
                                 .function_param_is_ptr

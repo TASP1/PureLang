@@ -9,7 +9,7 @@
 - [x] **Type checker + Ownership analysis**
 - [x] **LLVM IR code generation**
 - [x] **WebAssembly backend**
-- [ ] Standard library
+- [x] Standard library (math builtins via libm)
 
 > **Note:** PureLang is a **public** repository. CI uses free public GitHub Actions minutes (does not consume private-repo Actions quotas).
 
@@ -53,9 +53,9 @@
 
 ## Phase 4 — Standard Library & Tooling
 
-- Core collections (Vec, String, Map, etc.)
+- [x] Math helpers (abs, min, max, pow, sqrt, floor, ceil, round, sin, cos, tan, log, exp)
+- Core collections (Vec, Map, etc.) — partial (List built-in)
 - File I/O, networking, concurrency primitives
-- Math / vector / matrix helpers (games & 3D)
 - Formatter (`pure fmt`)
 - Language Server (LSP)
 - Package manager foundation

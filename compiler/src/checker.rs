@@ -39,7 +39,7 @@ pub struct TypeChecker {
 
 impl TypeChecker {
     pub fn new() -> Self {
-        TypeChecker {
+        let mut tc = TypeChecker {
             scopes: vec![Scope {
                 vars: HashMap::new(),
             }],
@@ -49,6 +49,54 @@ impl TypeChecker {
             structs: HashMap::new(),
             enums: HashMap::new(),
             errors: Vec::new(),
+        };
+        tc.register_stdlib();
+        tc
+    }
+
+    /// Built-in standard library functions (always public).
+    fn register_stdlib(&mut self) {
+        use Type::*;
+        let n = || Number;
+        let builtins: &[(&str, Vec<Type>, Type)] = &[
+            // Math
+            ("abs", vec![n()], n()),
+            ("min", vec![n(), n()], n()),
+            ("max", vec![n(), n()], n()),
+            ("pow", vec![n(), n()], n()),
+            ("sqrt", vec![n()], n()),
+            ("floor", vec![n()], n()),
+            ("ceil", vec![n()], n()),
+            ("round", vec![n()], n()),
+            ("sin", vec![n()], n()),
+            ("cos", vec![n()], n()),
+            ("tan", vec![n()], n()),
+            ("log", vec![n()], n()),
+            ("exp", vec![n()], n()),
+            // Also available as std.*
+            ("std_abs", vec![n()], n()),
+            ("std_min", vec![n(), n()], n()),
+            ("std_max", vec![n(), n()], n()),
+            ("std_pow", vec![n(), n()], n()),
+            ("std_sqrt", vec![n()], n()),
+            ("std_floor", vec![n()], n()),
+            ("std_ceil", vec![n()], n()),
+            ("std_round", vec![n()], n()),
+            ("std_sin", vec![n()], n()),
+            ("std_cos", vec![n()], n()),
+            ("std_tan", vec![n()], n()),
+            ("std_log", vec![n()], n()),
+            ("std_exp", vec![n()], n()),
+        ];
+        for (name, params, ret) in builtins {
+            self.functions.insert(
+                name.to_string(),
+                Function {
+                    params: params.clone(),
+                    ret: Box::new(ret.clone()),
+                },
+            );
+            self.functions_pub.insert(name.to_string(), true);
         }
     }
 

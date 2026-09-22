@@ -1,0 +1,13 @@
+// Standard library math builtins (libm via clang -lm)
+
+fn main() {
+    print abs(0 - 7)
+    print min(3, 9)
+    print max(3, 9)
+    print pow(2, 10)
+    print sqrt(49)
+    print floor(10)
+    print ceil(10)
+    print std.sqrt(16)
+    print std.max(1, 100)
+}

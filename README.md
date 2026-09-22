@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.10.0**
+**Compiler:** `purec` **v0.11.0**
 
 ## Quick Example
 
@@ -49,7 +49,8 @@ fn main() {
 - [x] **Methods** (`fn Point.sum(self)` + `p.sum()`)
 - [x] **Enums + match**
 - [x] **Modules**
-- [x] **Visibility** (`pub` required to call across modules)
+- [x] **Visibility**
+- [x] **Standard library** (math: abs, min, max, pow, sqrt, … + `std.*`) (`pub` required to call across modules)
 - [x] **Traits** (`trait` / `impl Trait for Type`)
 - [x] **Generics** (`fn id[T](x: T)`) (`mod math { ... }` → `math.add()`)
 - [x] **Error handling** (`expr?` on Result/Option enums)
@@ -58,8 +59,8 @@ fn main() {
 - [x] CI on **public** GitHub Actions (free unlimited minutes)
 
 ### Next
-- [ ] Standard library
 - [ ] Formatter / LSP
+- [ ] File I/O & richer collections
 - [ ] Standard library
 - [ ] Formatter / LSP
 

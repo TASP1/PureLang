@@ -270,3 +270,26 @@ fn main() {
     // print util.secret(1)  // error: private
 }
 ```
+
+
+### Standard library (math)
+
+Always available (linked with `clang -lm`):
+
+```pure
+fn main() {
+    print abs(0 - 5)     // 5
+    print min(3, 9)      // 3
+    print max(3, 9)      // 9
+    print pow(2, 10)     // 1024
+    print sqrt(49)       // 7
+    print floor(10)
+    print ceil(10)
+    print sin(0)
+    print cos(0)
+    // also: std.sqrt(16), std.max(1, 100), ...
+}
+```
+
+Functions: `abs`, `min`, `max`, `pow`, `sqrt`, `floor`, `ceil`, `round`, `sin`, `cos`, `tan`, `log`, `exp`
+(and the same under the `std.` prefix).

@@ -29,7 +29,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.10.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
+        println!("purec 0.11.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
         return;
     }
 
@@ -236,7 +236,7 @@ fn main() {
 
     // Compile IR with clang
     let status = Command::new("clang")
-        .args(["-O2", "-o", &bin_path, &ir_path])
+        .args(["-O2", "-lm", "-o", &bin_path, &ir_path])
         .status();
 
     match status {
