@@ -182,3 +182,50 @@ fn main() {
 ```
 
 Unit variants and single-Number payload variants are supported. Match arms use `Enum.Variant => body` or `Enum.Variant(binding) => body`.
+
+### Typed parameters
+
+```pure
+fn add(a: Number, b: Number) {
+    return a + b
+}
+
+fn take(p: Point) {
+    print p.x
+}
+```
+
+### Error handling with `?`
+
+```pure
+enum Result {
+    Ok(value)
+    Err
+}
+
+fn maybe(x: Number) {
+    if x < 0 {
+        return Result.Err
+    }
+    return Result.Ok(x)
+}
+
+fn main() {
+    v = maybe(10)?
+    print v
+}
+```
+
+### Modules
+
+```pure
+mod math {
+    fn add(a: Number, b: Number) {
+        return a + b
+    }
+}
+
+fn main() {
+    print math.add(1, 2)
+}
+```

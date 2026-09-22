@@ -1,0 +1,22 @@
+// Error handling with ?
+
+enum Result {
+    Ok(value)
+    Err
+}
+
+fn maybe_div(a: Number, b: Number) {
+    if b == 0 {
+        return Result.Err
+    }
+    return Result.Ok(a / b)
+}
+
+fn main() {
+    x = maybe_div(10, 2)?
+    print x
+
+    // This path returns early (err)
+    y = maybe_div(10, 0)?
+    print "unreachable"
+}

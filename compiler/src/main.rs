@@ -29,7 +29,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.8.2 (PureLang — lexer + parser + typecheck + llvm + wasm)");
+        println!("purec 0.9.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
         return;
     }
 
@@ -293,16 +293,23 @@ fn print_item(item: &Item, level: usize) {
             params,
             body,
         } => {
+            let ps: Vec<String> = params
+                .iter()
+                .map(|p| match &p.ty_annotation {
+                    Some(ty) => format!("{}: {}", p.name, ty),
+                    None => p.name.clone(),
+                })
+                .collect();
             if let Some(recv) = receiver {
                 println!(
                     "{}Fn {}.{}({})",
                     indent(level),
                     recv,
                     name,
-                    params.join(", ")
+                    ps.join(", ")
                 );
             } else {
-                println!("{}Fn {}({})", indent(level), name, params.join(", "));
+                println!("{}Fn {}({})", indent(level), name, ps.join(", "));
             }
             print_block(body, level + 1);
         }
@@ -325,6 +332,12 @@ fn print_item(item: &Item, level: usize) {
                         v.fields.join(", ")
                     );
                 }
+            }
+        }
+        Item::Module { name, items } => {
+            println!("{}Mod {}", indent(level), name);
+            for it in items {
+                print_item(it, level + 1);
             }
         }
     }
@@ -457,6 +470,10 @@ fn print_expr(expr: &Expr, level: usize) {
             println!("{}Index", indent(level));
             print_expr(object, level + 1);
             print_expr(index, level + 1);
+        }
+        Expr::Try(e) => {
+            println!("{}Try", indent(level));
+            print_expr(e, level + 1);
         }
     }
 }

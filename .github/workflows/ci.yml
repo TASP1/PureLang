@@ -33,7 +33,7 @@ jobs:
           test -f docs/ROADMAP.md
           test -f LICENSE
           test -f CONTRIBUTING.md
-          for f in hello game_loop funcs structs lists list_loop methods enums; do
+          for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules; do
             test -f examples/$f.pure
           done
 
@@ -75,13 +75,13 @@ jobs:
 
       - name: Type-check examples
         run: |
-          for f in hello game_loop funcs structs lists list_loop methods enums; do
+          for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules; do
             cargo run --release -- ../examples/$f.pure
           done
 
       - name: Compile & run examples (native)
         run: |
-          for f in hello game_loop funcs structs lists list_loop methods enums; do
+          for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules; do
             cargo run --release -- --compile -o /tmp/$f ../examples/$f.pure
             echo "=== $f ==="
             /tmp/$f

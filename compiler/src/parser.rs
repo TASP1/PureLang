@@ -78,9 +78,14 @@ impl Parser {
             Token::Fn => self.parse_function(),
             Token::Struct => self.parse_struct(),
             Token::Enum => self.parse_enum(),
+            Token::Mod => self.parse_module(),
+            Token::Pub => {
+                self.advance(); // pub is accepted and ignored for MVP (all items public)
+                self.parse_item()
+            }
             other => Err(ParseError {
                 message: format!(
-                    "Expected top-level item (fn, struct, or enum), found {:?}",
+                    "Expected top-level item (fn, struct, enum, or mod), found {:?}",
                     other
                 ),
             }),
@@ -103,7 +108,17 @@ impl Parser {
         let mut params = Vec::new();
         if !matches!(self.peek(), Token::RParen) {
             loop {
-                params.push(self.expect_ident()?);
+                let pname = self.expect_ident()?;
+                let ty_annotation = if matches!(self.peek(), Token::Colon) {
+                    self.advance();
+                    Some(self.expect_ident()?)
+                } else {
+                    None
+                };
+                params.push(Param {
+                    name: pname,
+                    ty_annotation,
+                });
                 if matches!(self.peek(), Token::Comma) {
                     self.advance();
                 } else {
@@ -172,6 +187,18 @@ impl Parser {
         }
         self.expect(Token::RBrace)?;
         Ok(Item::Enum { name, variants })
+    }
+
+    fn parse_module(&mut self) -> Result<Item, ParseError> {
+        self.expect(Token::Mod)?;
+        let name = self.expect_ident()?;
+        self.expect(Token::LBrace)?;
+        let mut items = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            items.push(self.parse_item()?);
+        }
+        self.expect(Token::RBrace)?;
+        Ok(Item::Module { name, items })
     }
 
     fn parse_block(&mut self) -> Result<Block, ParseError> {
@@ -436,6 +463,10 @@ impl Parser {
                         object: Box::new(expr),
                         index: Box::new(index),
                     };
+                }
+                Token::Question => {
+                    self.advance();
+                    expr = Expr::Try(Box::new(expr));
                 }
                 _ => break,
             }

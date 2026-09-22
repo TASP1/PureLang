@@ -13,7 +13,7 @@ pub enum Item {
         /// Optional receiver type for methods: `fn Point.distance(self) { ... }`
         receiver: Option<String>,
         name: String,
-        params: Vec<String>,
+        params: Vec<Param>,
         body: Block,
     },
     Struct {
@@ -25,6 +25,19 @@ pub enum Item {
         name: String,
         variants: Vec<EnumVariant>,
     },
+    /// `mod name { ... }`
+    Module {
+        name: String,
+        items: Vec<Item>,
+    },
+}
+
+/// Function parameter: `name` or `name: Type`
+#[derive(Debug, Clone, PartialEq)]
+pub struct Param {
+    pub name: String,
+    /// Optional type annotation (Number, String, Bool, or struct/enum name)
+    pub ty_annotation: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -135,6 +148,8 @@ pub enum Expr {
         object: Box<Expr>,
         index: Box<Expr>,
     },
+    /// `expr?` — unwrap Ok/Some or early-return on Err/None
+    Try(Box<Expr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,0 +1,16 @@
+// Modules: mod name { fn ... } called as name.fn(...)
+
+mod math {
+    fn add(a: Number, b: Number) {
+        return a + b
+    }
+
+    fn double(x: Number) {
+        return x * 2
+    }
+}
+
+fn main() {
+    print math.add(40, 2)
+    print math.double(21)
+}

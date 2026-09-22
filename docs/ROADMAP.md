@@ -32,13 +32,15 @@
 - [x] User-defined functions + calls + return values
 - [x] Structs (declaration, construction, field access)
 - [x] Lists (literal, length, indexing, for-in)
-- [x] Methods on structs (`fn Point.distance(self)`)
-- [ ] Full ownership & borrow checker
+- [x] Methods on structs
+- [x] Typed parameters (`fn f(x: Number)`) (`fn Point.distance(self)`)
+- [x] Full ownership & borrow checker (moves + borrows)
 - [x] Enums + match (`enum Color { Red Green }` + `match c { Color.Red => ... }`)
 
 - [ ] Generics / traits
-- [ ] Error handling with `?`
-- [ ] Modules and visibility
+- [x] Error handling with `?`
+- [x] Modules (`mod name { ... }` + `name.fn()`)
+- [ ] Visibility refinements
 
 ## Phase 3 — Performance & Platforms
 

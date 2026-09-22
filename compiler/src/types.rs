@@ -27,18 +27,19 @@ pub enum Type {
 }
 
 impl Type {
+    /// Types that are trivially copyable (no ownership transfer needed).
     pub fn is_copy(&self) -> bool {
-        // Phase 2 MVP: lists/structs/enums are Copy for field/index reads.
-        // Real borrow checking comes later.
         matches!(
             self,
-            Type::Number
-                | Type::Bool
-                | Type::Range
-                | Type::Void
-                | Type::Struct(_)
-                | Type::Enum(_)
-                | Type::List(_)
+            Type::Number | Type::Bool | Type::Range | Type::Void | Type::Enum(_) | Type::Unknown
+        )
+    }
+
+    /// Types that own heap/stack resources and move by default.
+    pub fn is_move_type(&self) -> bool {
+        matches!(
+            self,
+            Type::String | Type::List(_) | Type::Struct(_) | Type::Function { .. }
         )
     }
 

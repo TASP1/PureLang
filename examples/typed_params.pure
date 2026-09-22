@@ -1,0 +1,26 @@
+// Typed parameters: fn name(x: Type)
+
+struct Point {
+    x
+    y
+}
+
+fn take_point(p: Point) {
+    print p.x
+    print p.y
+}
+
+fn add(a: Number, b: Number) {
+    return a + b
+}
+
+fn greet(name: String) {
+    print "Hello, " + name
+}
+
+fn main() {
+    p = Point(10, 20)
+    take_point(p)
+    print add(40, 2)
+    greet("PureLang")
+}

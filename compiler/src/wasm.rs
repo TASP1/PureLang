@@ -83,7 +83,7 @@ impl WasmCodegen {
         idx
     }
 
-    fn emit_main(&mut self, _params: &[String], body: &Block) {
+    fn emit_main(&mut self, _params: &[Param], body: &Block) {
         self.vars.clear();
         self.locals.clear();
         self.body.clear();
@@ -342,7 +342,11 @@ impl WasmCodegen {
                 }
             },
             Expr::Range { start, .. } => self.emit_expr(start),
-            Expr::List(_) | Expr::Call { .. } | Expr::Field { .. } | Expr::Index { .. } => {
+            Expr::List(_)
+            | Expr::Call { .. }
+            | Expr::Field { .. }
+            | Expr::Index { .. }
+            | Expr::Try(_) => {
                 self.errors.push("wasm: unsupported expression".into());
                 self.body.push("    i64.const 0".into());
             }

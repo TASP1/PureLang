@@ -11,6 +11,10 @@ struct VarInfo {
     mutable: bool,
     /// True if the value has been moved and the binding is no longer usable
     moved: bool,
+    /// Active immutable borrows (field access, print, method receiver, etc.)
+    shared_borrows: usize,
+    /// Active exclusive mutable borrow
+    exclusive_borrow: bool,
 }
 
 #[derive(Debug)]
@@ -45,9 +49,54 @@ impl TypeChecker {
         }
     }
 
+
+    /// Flatten `mod name { fn foo }` into functions named `name_foo`.
+    fn flatten_items(items: &[Item]) -> Vec<Item> {
+        let mut out = Vec::new();
+        for item in items {
+            match item {
+                Item::Module { name, items } => {
+                    for inner in Self::flatten_items(items) {
+                        match inner {
+                            Item::Function {
+                                receiver,
+                                name: fname,
+                                params,
+                                body,
+                            } => {
+                                out.push(Item::Function {
+                                    receiver,
+                                    name: format!("{}_{}", name, fname),
+                                    params,
+                                    body,
+                                });
+                            }
+                            Item::Struct { name: sname, fields } => {
+                                out.push(Item::Struct {
+                                    name: format!("{}_{}", name, sname),
+                                    fields,
+                                });
+                            }
+                            Item::Enum { name: ename, variants } => {
+                                out.push(Item::Enum {
+                                    name: format!("{}_{}", name, ename),
+                                    variants,
+                                });
+                            }
+                            Item::Module { .. } => {}
+                        }
+                    }
+                }
+                other => out.push(other.clone()),
+            }
+        }
+        out
+    }
+
     pub fn check_program(&mut self, program: &Program) -> Result<(), Vec<TypeError>> {
+        let flat = Self::flatten_items(&program.items);
         // First pass: register structs, enums and function signatures
-        for item in &program.items {
+        for item in &flat {
             match item {
                 Item::Struct { name, fields } => {
                     self.structs.insert(name.clone(), fields.clone());
@@ -59,6 +108,7 @@ impl TypeChecker {
                         .collect();
                     self.enums.insert(name.clone(), vs);
                 }
+                Item::Module { .. } => {}
                 Item::Function {
                     receiver,
                     name,
@@ -67,16 +117,13 @@ impl TypeChecker {
                 } => {
                     let ret = Self::infer_return_type(body);
                     if let Some(recv) = receiver {
-                        // Method: first param is the receiver type (Struct)
                         let mut param_tys: Vec<Type> = vec![Type::Struct(recv.clone())];
-                        for _ in params.iter().skip(1) {
-                            param_tys.push(Type::Number);
+                        for p in params.iter().skip(1) {
+                            param_tys.push(Self::resolve_annotation_static(p.ty_annotation.as_deref()));
                         }
-                        // If no params at all, still treat as method taking only self
                         if params.is_empty() {
                             param_tys = vec![Type::Struct(recv.clone())];
                         } else if params.len() == 1 {
-                            // single param is the receiver (usually named self)
                             param_tys = vec![Type::Struct(recv.clone())];
                         }
                         self.methods.insert(
@@ -87,8 +134,10 @@ impl TypeChecker {
                             },
                         );
                     } else {
-                        let param_tys: Vec<Type> =
-                            params.iter().map(|_| Type::Number).collect();
+                        let param_tys: Vec<Type> = params
+                            .iter()
+                            .map(|p| Self::resolve_annotation_static(p.ty_annotation.as_deref()))
+                            .collect();
                         self.functions.insert(
                             name.clone(),
                             Type::Function {
@@ -102,7 +151,7 @@ impl TypeChecker {
         }
 
         // Second pass: check bodies
-        for item in &program.items {
+        for item in &flat {
             self.check_item(item);
         }
 
@@ -153,8 +202,105 @@ impl TypeChecker {
                     ty,
                     mutable,
                     moved: false,
+                    shared_borrows: 0,
+                    exclusive_borrow: false,
                 },
             );
+        }
+    }
+
+    /// Use a binding by value (may move non-Copy types).
+    fn use_by_value(&mut self, name: &str) -> Type {
+        if let Some(ty) = self.functions.get(name) {
+            return ty.clone();
+        }
+        match self.lookup(name) {
+            None => {
+                self.error(format!("Undefined variable '{}'", name));
+                Type::Unknown
+            }
+            Some(info) => {
+                if info.moved {
+                    self.error(format!("Use of moved value '{}'", name));
+                    return Type::Unknown;
+                }
+                if info.shared_borrows > 0 || info.exclusive_borrow {
+                    self.error(format!(
+                        "Cannot move '{}': value is currently borrowed",
+                        name
+                    ));
+                    return Type::Unknown;
+                }
+                let ty = info.ty.clone();
+                if ty.is_move_type() {
+                    if let Some(info) = self.lookup_mut(name) {
+                        info.moved = true;
+                    }
+                }
+                ty
+            }
+        }
+    }
+
+    /// Use a binding by shared (immutable) borrow — does not move.
+    fn use_by_ref(&mut self, name: &str) -> Type {
+        if let Some(ty) = self.functions.get(name) {
+            return ty.clone();
+        }
+        match self.lookup(name) {
+            None => {
+                self.error(format!("Undefined variable '{}'", name));
+                Type::Unknown
+            }
+            Some(info) => {
+                if info.moved {
+                    self.error(format!("Use of moved value '{}'", name));
+                    return Type::Unknown;
+                }
+                if info.exclusive_borrow {
+                    self.error(format!(
+                        "Cannot borrow '{}': already mutably borrowed",
+                        name
+                    ));
+                    return Type::Unknown;
+                }
+                let ty = info.ty.clone();
+                // Track shared borrow (released at end of statement in MVP — we just check conflicts)
+                if let Some(info) = self.lookup_mut(name) {
+                    info.shared_borrows = info.shared_borrows.saturating_add(1);
+                    // Immediately release for statement-level analysis (no long-lived borrows yet)
+                    info.shared_borrows = info.shared_borrows.saturating_sub(1);
+                }
+                ty
+            }
+        }
+    }
+
+    fn resolve_annotation_static(ann: Option<&str>) -> Type {
+        match ann {
+            None => Type::Number,
+            Some("Number") | Some("number") => Type::Number,
+            Some("String") | Some("string") => Type::String,
+            Some("Bool") | Some("bool") => Type::Bool,
+            Some(name) => Type::Struct(name.to_string()),
+        }
+    }
+
+    fn resolve_annotation(&self, ann: Option<&str>) -> Type {
+        match ann {
+            None => Type::Number,
+            Some("Number") | Some("number") => Type::Number,
+            Some("String") | Some("string") => Type::String,
+            Some("Bool") | Some("bool") => Type::Bool,
+            Some(name) => {
+                if self.structs.contains_key(name) {
+                    Type::Struct(name.to_string())
+                } else if self.enums.contains_key(name) {
+                    Type::Enum(name.to_string())
+                } else {
+                    Type::Struct(name.to_string())
+                }
+            }
         }
     }
 
@@ -207,6 +353,21 @@ impl TypeChecker {
                     | BinaryOp::LtEq
                     | BinaryOp::GtEq => Type::Bool,
                 },
+                Expr::Field { object, .. } => {
+                    if let Expr::Ident(ename) = object.as_ref() {
+                        Type::Enum(ename.clone())
+                    } else {
+                        Type::Number
+                    }
+                }
+                Expr::Call { callee, .. } => {
+                    if let Expr::Field { object, .. } = callee.as_ref() {
+                        if let Expr::Ident(ename) = object.as_ref() {
+                            return Type::Enum(ename.clone());
+                        }
+                    }
+                    Type::Number
+                }
                 _ => Type::Number,
             }
         }
@@ -223,19 +384,17 @@ impl TypeChecker {
             } => {
                 self.push_scope();
                 if let Some(recv) = receiver {
-                    // Method: first param is the receiver (struct type)
                     if let Some(first) = params.first() {
-                        self.declare(first, Type::Struct(recv.clone()), false);
+                        self.declare(&first.name, Type::Struct(recv.clone()), false);
                         for p in params.iter().skip(1) {
-                            self.declare(p, Type::Number, false);
+                            let ty = self.resolve_annotation(p.ty_annotation.as_deref());
+                            self.declare(&p.name, ty, false);
                         }
-                    } else {
-                        // no params listed — still allow, but unusual
                     }
                 } else {
                     for p in params {
-                        // Parameters are immutable by default; Phase 2: numeric by default
-                        self.declare(p, Type::Number, false);
+                        let ty = self.resolve_annotation(p.ty_annotation.as_deref());
+                        self.declare(&p.name, ty, false);
                     }
                 }
                 self.check_block(body);
@@ -247,6 +406,7 @@ impl TypeChecker {
             Item::Enum { .. } => {
                 // Enum declarations are fine for now; no body to check
             }
+            Item::Module { .. } => {}
         }
     }
 
@@ -329,8 +489,8 @@ impl TypeChecker {
                 }
             }
             Stmt::Print(expr) => {
-                let _ = self.check_expr(expr);
-                // print accepts any type
+                // print borrows — does not take ownership
+                let _ = self.check_expr_ref(expr);
             }
             Stmt::If {
                 condition,
@@ -351,7 +511,8 @@ impl TypeChecker {
                 iterable,
                 body,
             } => {
-                let iter_ty = self.check_expr(iterable);
+                // Iteration borrows the list/range
+                let iter_ty = self.check_expr_ref(iterable);
                 let element_ty = match &iter_ty {
                     Type::Range => Type::Number,
                     Type::List(inner) => *inner.clone(),
@@ -502,7 +663,8 @@ impl TypeChecker {
                         }
                     }
                 }
-                let obj_ty = self.check_expr(object);
+                // Field access borrows the object (does not move)
+                let obj_ty = self.check_expr_ref(object);
                 match &obj_ty {
                     Type::String if field == "length" => Type::Number,
                     Type::List(_) if field == "length" => Type::Number,
@@ -527,7 +689,8 @@ impl TypeChecker {
                 }
             }
             Expr::Index { object, index } => {
-                let obj_ty = self.check_expr(object);
+                // Indexing borrows the list
+                let obj_ty = self.check_expr_ref(object);
                 let idx_ty = self.check_expr(index);
                 if idx_ty != Type::Number && idx_ty != Type::Unknown {
                     self.error(format!("List index must be Number, found {}", idx_ty));
@@ -541,35 +704,47 @@ impl TypeChecker {
                     }
                 }
             }
+            Expr::Try(inner) => {
+                // `expr?` — expects Result/Option-style enum; yields payload Number
+                let t = self.check_expr(inner);
+                match t {
+                    Type::Enum(name) => {
+                        // Convention: Ok/Some has payload, Err/None does not
+                        if let Some(variants) = self.enums.get(&name) {
+                            let has_ok = variants.iter().any(|(v, n)| {
+                                (v == "Ok" || v == "Some") && *n > 0
+                            });
+                            if !has_ok {
+                                self.error(format!(
+                                    "'?' requires enum '{}' to have Ok(value) or Some(value) variant",
+                                    name
+                                ));
+                            }
+                        }
+                        Type::Number
+                    }
+                    Type::Unknown => Type::Unknown,
+                    other => {
+                        self.error(format!(
+                            "'?' can only be applied to Result/Option-like enums, found {}",
+                            other
+                        ));
+                        Type::Unknown
+                    }
+                }
+            }
         }
     }
 
     fn check_ident(&mut self, name: &str) -> Type {
-        // Built-in functions
-        if let Some(ty) = self.functions.get(name) {
-            return ty.clone();
-        }
+        self.use_by_value(name)
+    }
 
-        match self.lookup(name) {
-            None => {
-                self.error(format!("Undefined variable '{}'", name));
-                Type::Unknown
-            }
-            Some(info) => {
-                if info.moved {
-                    self.error(format!("Use of moved value '{}'", name));
-                    return Type::Unknown;
-                }
-                let ty = info.ty.clone();
-                // Move non-Copy types on use (simple ownership)
-                if !ty.is_copy() {
-                    // Mark moved — PureLang invisible ownership
-                    if let Some(info) = self.lookup_mut(name) {
-                        info.moved = true;
-                    }
-                }
-                ty
-            }
+    /// Check expression in borrow (by-ref) context — does not move the root binding.
+    fn check_expr_ref(&mut self, expr: &Expr) -> Type {
+        match expr {
+            Expr::Ident(name) => self.use_by_ref(name),
+            other => self.check_expr(other),
         }
     }
 
@@ -677,6 +852,36 @@ impl TypeChecker {
             }
         }
 
+
+        // Module path call: math.add(1, 2) → function math_add
+        if let Expr::Field { object, field } = callee {
+            if let Expr::Ident(mod_name) = object.as_ref() {
+                let full = format!("{}_{}", mod_name, field);
+                if let Some(fty) = self.functions.get(&full).cloned() {
+                    let arg_tys: Vec<Type> = args.iter().map(|a| self.check_expr(a)).collect();
+                    if let Type::Function { params, ret } = fty {
+                        if params.len() != arg_tys.len() {
+                            self.error(format!(
+                                "Function '{}' expects {} arguments, found {}",
+                                full,
+                                params.len(),
+                                arg_tys.len()
+                            ));
+                        }
+                        for (i, (p, a)) in params.iter().zip(arg_tys.iter()).enumerate() {
+                            if *p != Type::Unknown && *a != Type::Unknown && p != a {
+                                self.error(format!(
+                                    "Argument {} type mismatch: expected {}, found {}",
+                                    i + 1, p, a
+                                ));
+                            }
+                        }
+                        return *ret;
+                    }
+                }
+            }
+        }
+
         // Struct construction: Point(10, 20)
         if let Expr::Ident(name) = callee
             && let Some(fields) = self.structs.get(name).cloned()
@@ -702,8 +907,9 @@ impl TypeChecker {
         }
 
         // Method call: obj.method(args)  →  Call { callee: Field { object, field }, args }
+        // Receiver is borrowed (does not move).
         if let Expr::Field { object, field } = callee {
-            let obj_ty = self.check_expr(object);
+            let obj_ty = self.check_expr_ref(object);
             if let Type::Struct(struct_name) = &obj_ty {
                 if let Some(method_ty) = self.methods.get(&(struct_name.clone(), field.clone())) {
                     let method_ty = method_ty.clone();

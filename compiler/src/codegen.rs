@@ -15,8 +15,10 @@ pub struct Codegen {
     temp: usize,
     label: usize,
     vars: HashMap<String, (String, VarKind)>,
-    /// function name → param count (all i64 for now)
+    /// function name → param count
     functions: HashMap<String, usize>,
+    /// function name → whether each param is a pointer (Struct/String)
+    function_param_is_ptr: HashMap<String, Vec<bool>>,
     /// struct name → field names
     structs: HashMap<String, Vec<String>>,
     /// enum name → list of (variant name, field count)
@@ -50,6 +52,7 @@ impl Codegen {
             label: 0,
             vars: HashMap::new(),
             functions: HashMap::new(),
+            function_param_is_ptr: HashMap::new(),
             structs: HashMap::new(),
             enums: HashMap::new(),
             current_is_main: true,
@@ -57,11 +60,54 @@ impl Codegen {
         }
     }
 
+    fn flatten_items(items: &[Item]) -> Vec<Item> {
+        let mut out = Vec::new();
+        for item in items {
+            match item {
+                Item::Module { name, items } => {
+                    for inner in Self::flatten_items(items) {
+                        match inner {
+                            Item::Function {
+                                receiver,
+                                name: fname,
+                                params,
+                                body,
+                            } => {
+                                out.push(Item::Function {
+                                    receiver,
+                                    name: format!("{}_{}", name, fname),
+                                    params,
+                                    body,
+                                });
+                            }
+                            Item::Struct { name: sname, fields } => {
+                                out.push(Item::Struct {
+                                    name: format!("{}_{}", name, sname),
+                                    fields,
+                                });
+                            }
+                            Item::Enum { name: ename, variants } => {
+                                out.push(Item::Enum {
+                                    name: format!("{}_{}", name, ename),
+                                    variants,
+                                });
+                            }
+                            Item::Module { .. } => {}
+                        }
+                    }
+                }
+                other => out.push(other.clone()),
+            }
+        }
+        out
+    }
+
     pub fn generate(&mut self, program: &Program) -> Result<String, Vec<String>> {
         self.emit_preamble();
 
+        let flat = Self::flatten_items(&program.items);
         // Register structs, enums & functions first
-        for item in &program.items {
+        for item in &flat {
             match item {
                 Item::Struct { name, fields } => {
                     self.structs.insert(name.clone(), fields.clone());
@@ -76,25 +122,54 @@ impl Codegen {
                         .collect();
                     self.enums.insert(name.clone(), vs);
                 }
+                Item::Module { .. } => {}
                 Item::Function {
                     receiver,
                     name,
                     params,
                     ..
                 } => {
-                    // Methods are emitted as StructName_methodname
                     let full_name = if let Some(recv) = receiver {
                         format!("{}_{}", recv, name)
                     } else {
                         name.clone()
                     };
-                    self.functions.insert(full_name, params.len());
+                    self.functions.insert(full_name.clone(), params.len());
+                    let mut is_ptr = Vec::new();
+                    if receiver.is_some() {
+                        is_ptr.push(true); // self
+                        for p in params.iter().skip(1) {
+                            let ptr = matches!(
+                                p.ty_annotation.as_deref(),
+                                Some("String") | Some("string")
+                            ) || p.ty_annotation.as_ref().map(|s| {
+                                s != "Number" && s != "number" && s != "Bool" && s != "bool"
+                            }).unwrap_or(false);
+                            is_ptr.push(ptr);
+                        }
+                        if params.is_empty() {
+                            is_ptr = vec![true];
+                        } else if params.len() == 1 {
+                            is_ptr = vec![true];
+                        }
+                    } else {
+                        for p in params {
+                            let ptr = matches!(
+                                p.ty_annotation.as_deref(),
+                                Some("String") | Some("string")
+                            ) || p.ty_annotation.as_ref().map(|s| {
+                                s != "Number" && s != "number" && s != "Bool" && s != "bool"
+                            }).unwrap_or(false);
+                            is_ptr.push(ptr);
+                        }
+                    }
+                    self.function_param_is_ptr.insert(full_name, is_ptr);
                 }
             }
         }
 
         let mut funcs = String::new();
-        for item in &program.items {
+        for item in &flat {
             if let Item::Function {
                 receiver,
                 name,
@@ -107,7 +182,7 @@ impl Codegen {
                 } else {
                     name.clone()
                 };
-                self.emit_function(&full_name, params, body);
+                self.emit_function(&full_name, params, body, receiver.is_some());
                 funcs.push_str(&self.body);
             }
         }
@@ -191,7 +266,7 @@ impl Codegen {
         format!("{}.{}", prefix, l)
     }
 
-    fn emit_function(&mut self, name: &str, params: &[String], body: &Block) {
+    fn emit_function(&mut self, name: &str, params: &[Param], body: &Block, is_method: bool) {
         self.vars.clear();
         self.temp = 0;
         self.label = 0;
@@ -199,8 +274,6 @@ impl Codegen {
 
         let is_main = name == "main";
         self.current_is_main = is_main;
-        // Detect method: name like "Point_distance" and first param is receiver (struct ptr)
-        let is_method = name.contains('_') && !params.is_empty();
         if is_main {
             self.body.push_str("define i32 @main() {\nentry:\n");
         } else if is_method {
@@ -218,32 +291,58 @@ impl Codegen {
             self.body.push_str("entry:\n");
             // Store self (incoming ptr) into a stack slot so Ident load works uniformly
             if let Some(first) = params.first() {
-                let ptr = format!("%{}.addr", first);
+                let ptr = format!("%{}.addr", first.name);
                 let _ = writeln!(self.body, "  {} = alloca ptr, align 8", ptr);
                 let _ = writeln!(self.body, "  store ptr %arg0, ptr {}, align 8", ptr);
                 self.vars
-                    .insert(first.clone(), (ptr, VarKind::Struct));
+                    .insert(first.name.clone(), (ptr, VarKind::Struct));
             }
             for (i, p) in params.iter().enumerate().skip(1) {
-                let ptr = format!("%{}.addr", p);
+                let ptr = format!("%{}.addr", p.name);
                 let _ = writeln!(self.body, "  {} = alloca i64, align 8", ptr);
                 let _ = writeln!(self.body, "  store i64 %arg{}, ptr {}, align 8", i, ptr);
-                self.vars.insert(p.clone(), (ptr, VarKind::Number));
+                self.vars.insert(p.name.clone(), (ptr, VarKind::Number));
             }
         } else {
-            let param_list = params
+            let is_ptrs = self
+                .function_param_is_ptr
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| params.iter().map(|_| false).collect());
+            let param_list: Vec<String> = params
                 .iter()
                 .enumerate()
-                .map(|(i, _)| format!("i64 %arg{}", i))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let _ = writeln!(self.body, "define i64 @{}({}) {{", name, param_list);
+                .map(|(i, _)| {
+                    if is_ptrs.get(i).copied().unwrap_or(false) {
+                        format!("ptr %arg{}", i)
+                    } else {
+                        format!("i64 %arg{}", i)
+                    }
+                })
+                .collect();
+            let _ = writeln!(
+                self.body,
+                "define i64 @{}({}) {{",
+                name,
+                param_list.join(", ")
+            );
             self.body.push_str("entry:\n");
             for (i, p) in params.iter().enumerate() {
-                let ptr = format!("%{}.addr", p);
-                let _ = writeln!(self.body, "  {} = alloca i64, align 8", ptr);
-                let _ = writeln!(self.body, "  store i64 %arg{}, ptr {}, align 8", i, ptr);
-                self.vars.insert(p.clone(), (ptr, VarKind::Number));
+                let is_ptr = is_ptrs.get(i).copied().unwrap_or(false);
+                let slot = format!("%{}.addr", p.name);
+                if is_ptr {
+                    let _ = writeln!(self.body, "  {} = alloca ptr, align 8", slot);
+                    let _ = writeln!(self.body, "  store ptr %arg{}, ptr {}, align 8", i, slot);
+                    let kind = match p.ty_annotation.as_deref() {
+                        Some("String") | Some("string") => VarKind::String,
+                        _ => VarKind::Struct,
+                    };
+                    self.vars.insert(p.name.clone(), (slot, kind));
+                } else {
+                    let _ = writeln!(self.body, "  {} = alloca i64, align 8", slot);
+                    let _ = writeln!(self.body, "  store i64 %arg{}, ptr {}, align 8", i, slot);
+                    self.vars.insert(p.name.clone(), (slot, VarKind::Number));
+                }
             }
         }
 
@@ -808,25 +907,63 @@ impl Codegen {
                         return (ptr, VarKind::Struct);
                     }
                     if self.functions.contains_key(name) {
-                        let mut arg_vals = Vec::new();
-                        for a in args {
+                        let is_ptrs = self
+                            .function_param_is_ptr
+                            .get(name)
+                            .cloned()
+                            .unwrap_or_default();
+                        let mut arg_parts = Vec::new();
+                        for (i, a) in args.iter().enumerate() {
                             let (v, k) = self.emit_expr(a);
-                            if k != VarKind::Number {
+                            let want_ptr = is_ptrs.get(i).copied().unwrap_or(false);
+                            if want_ptr {
+                                arg_parts.push(format!("ptr {}", v));
+                            } else if k == VarKind::Number || k == VarKind::Enum {
+                                arg_parts.push(format!("i64 {}", v));
+                            } else {
                                 self.errors.push(format!(
-                                    "codegen: only Number args supported in calls for now ({})",
+                                    "codegen: argument type mismatch in call to {}",
                                     name
                                 ));
+                                arg_parts.push(format!("i64 0"));
                             }
-                            arg_vals.push(v);
                         }
-                        let args_ir = arg_vals
-                            .iter()
-                            .map(|v| format!("i64 {}", v))
-                            .collect::<Vec<_>>()
-                            .join(", ");
+                        let args_ir = arg_parts.join(", ");
                         let res = self.fresh();
                         let _ = writeln!(self.body, "  {} = call i64 @{}({})", res, name, args_ir);
                         return (res, VarKind::Number);
+                    }
+                }
+                // Module path: math.add(...) → @math_add(...)
+                if let Expr::Field { object, field } = callee.as_ref() {
+                    if let Expr::Ident(mod_name) = object.as_ref() {
+                        let full = format!("{}_{}", mod_name, field);
+                        if self.functions.contains_key(&full) {
+                            let is_ptrs = self
+                                .function_param_is_ptr
+                                .get(&full)
+                                .cloned()
+                                .unwrap_or_default();
+                            let mut arg_parts = Vec::new();
+                            for (i, a) in args.iter().enumerate() {
+                                let (v, k) = self.emit_expr(a);
+                                let want_ptr = is_ptrs.get(i).copied().unwrap_or(false);
+                                if want_ptr {
+                                    arg_parts.push(format!("ptr {}", v));
+                                } else {
+                                    arg_parts.push(format!("i64 {}", v));
+                                    let _ = k;
+                                }
+                            }
+                            let args_ir = arg_parts.join(", ");
+                            let res = self.fresh();
+                            let _ = writeln!(
+                                self.body,
+                                "  {} = call i64 @{}({})",
+                                res, full, args_ir
+                            );
+                            return (res, VarKind::Number);
+                        }
                     }
                 }
                 // Enum variant with payload: Option.Some(42) → (tag << 32) | payload
@@ -974,6 +1111,68 @@ impl Codegen {
                         .push(format!("codegen: unknown field '{}'", field));
                     ("0".into(), VarKind::Number)
                 }
+            }
+            Expr::Try(inner) => {
+                // expr? — if tag is Ok/Some extract payload; else early-return 0
+                let (val, kind) = self.emit_expr(inner);
+                if kind != VarKind::Enum && kind != VarKind::Number {
+                    self.errors.push("codegen: '?' on non-enum".into());
+                    return ("0".into(), VarKind::Number);
+                }
+                let tag = self.fresh();
+                let _ = writeln!(self.body, "  {} = lshr i64 {}, 32", tag, val);
+                // Find Ok/Some tag index — search all enums for Ok or Some with payload
+                let mut ok_tag: Option<usize> = None;
+                for (_ename, variants) in &self.enums {
+                    for (i, (v, nfields)) in variants.iter().enumerate() {
+                        if (v == "Ok" || v == "Some") && *nfields > 0 {
+                            ok_tag = Some(i);
+                            break;
+                        }
+                    }
+                    if ok_tag.is_some() {
+                        break;
+                    }
+                }
+                let ok_idx = ok_tag.unwrap_or(0);
+                let is_ok = self.fresh();
+                let _ = writeln!(
+                    self.body,
+                    "  {} = icmp eq i64 {}, {}",
+                    is_ok, tag, ok_idx
+                );
+                let ok_label = self.fresh_label("try.ok");
+                let err_label = self.fresh_label("try.err");
+                let cont_label = self.fresh_label("try.cont");
+                let _ = writeln!(
+                    self.body,
+                    "  br i1 {}, label %{}, label %{}",
+                    is_ok, ok_label, err_label
+                );
+                let _ = writeln!(self.body, "{}:", err_label);
+                if self.current_is_main {
+                    let _ = writeln!(self.body, "  ret i32 1");
+                } else {
+                    let _ = writeln!(self.body, "  ret i64 0");
+                }
+                let _ = writeln!(self.body, "{}:", ok_label);
+                let payload = self.fresh();
+                let _ = writeln!(
+                    self.body,
+                    "  {} = and i64 {}, 4294967295",
+                    payload, val
+                );
+                let _ = writeln!(self.body, "  br label %{}", cont_label);
+                let _ = writeln!(self.body, "{}:", cont_label);
+                // phi not needed if we only reach cont from ok; payload is defined on ok path
+                // but LLVM requires dominance — use phi
+                let result = self.fresh();
+                let _ = writeln!(
+                    self.body,
+                    "  {} = phi i64 [ {}, %{} ]",
+                    result, payload, ok_label
+                );
+                (result, VarKind::Number)
             }
         }
     }

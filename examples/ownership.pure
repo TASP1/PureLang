@@ -1,0 +1,35 @@
+// Ownership: lists/structs/strings move by default;
+// field access, indexing, print, methods, and for-in borrow.
+
+struct Point {
+    x
+    y
+}
+
+fn main() {
+    // Field access borrows — can use p again
+    p = Point(3, 4)
+    print p.x
+    print p.y
+    sum = p.x + p.y
+    print sum
+
+    // List: length and index borrow
+    nums = [10, 20, 30]
+    print nums.length
+    print nums[0]
+    print nums[1]
+    print nums[2]
+
+    // for-in borrows the list
+    mut total = 0
+    for n in nums {
+        total = total + n
+    }
+    print total
+
+    // String print borrows
+    name = "PureLang"
+    print name
+    print name
+}

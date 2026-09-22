@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.8.2**
+**Compiler:** `purec` **v0.9.0**
 
 ## Quick Example
 
@@ -48,11 +48,15 @@ fn main() {
 - [x] **Lists** (literal, `.length`, indexing, `for x in list`)
 - [x] **Methods** (`fn Point.sum(self)` + `p.sum()`)
 - [x] **Enums + match**
+- [x] **Modules** (`mod math { ... }` → `math.add()`)
+- [x] **Error handling** (`expr?` on Result/Option enums)
+- [x] **Typed params** (`fn f(x: Number, p: Point)`)
+- [x] **Ownership / borrows** (move non-Copy; field/print/for/method borrow)
 - [x] CI on **public** GitHub Actions (free unlimited minutes)
 
 ### Next
-- [ ] Full borrow checker
-- [ ] Generics / modules
+- [ ] Generics / traits
+- [ ] Visibility refinements
 - [ ] Standard library
 - [ ] Formatter / LSP
 
