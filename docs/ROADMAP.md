@@ -32,8 +32,9 @@
 - [x] User-defined functions + calls + return values
 - [x] Structs (declaration, construction, field access)
 - [x] Lists (literal, length, indexing, for-in)
+- [x] Methods on structs (`fn Point.distance(self)`)
 - [ ] Full ownership & borrow checker
-- [ ] Methods, enums
+- [ ] Enums
 - [ ] Pattern matching
 - [ ] Generics / traits
 - [ ] Error handling with `?`

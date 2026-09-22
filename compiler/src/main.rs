@@ -29,7 +29,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.8.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
+        println!("purec 0.8.1 (PureLang — lexer + parser + typecheck + llvm + wasm)");
         return;
     }
 
@@ -261,7 +261,7 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.8.0");
+    eprintln!("PureLang Compiler (purec) v0.8.1");
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  purec <file.pure>              Type-check");
@@ -287,8 +287,23 @@ fn print_program(program: &Program, level: usize) {
 
 fn print_item(item: &Item, level: usize) {
     match item {
-        Item::Function { name, params, body } => {
-            println!("{}Fn {}({})", indent(level), name, params.join(", "));
+        Item::Function {
+            receiver,
+            name,
+            params,
+            body,
+        } => {
+            if let Some(recv) = receiver {
+                println!(
+                    "{}Fn {}.{}({})",
+                    indent(level),
+                    recv,
+                    name,
+                    params.join(", ")
+                );
+            } else {
+                println!("{}Fn {}({})", indent(level), name, params.join(", "));
+            }
             print_block(body, level + 1);
         }
         Item::Struct { name, fields } => {

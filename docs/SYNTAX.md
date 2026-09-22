@@ -125,3 +125,28 @@ Simple programs look extremely simple.
 Powerful features (ownership, types, generics, SIMD, etc.) are available when needed but stay out of the way for everyday code.
 
 This syntax is intentionally designed so that someone who knows basic Python can become productive in PureLang within minutes, while still getting systems-level performance and safety.
+
+### Methods (on structs)
+
+```pure
+struct Point {
+    x
+    y
+}
+
+fn Point.sum(self) {
+    return self.x + self.y
+}
+
+fn Point.scale(self, factor) {
+    return self.x * factor + self.y * factor
+}
+
+fn main() {
+    p = Point(3, 4)
+    print p.sum()      // 7
+    print p.scale(2)   // 14
+}
+```
+
+Define methods with `fn TypeName.method(self, ...)`. Call them with `obj.method(args)`.

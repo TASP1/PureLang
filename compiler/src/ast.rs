@@ -10,6 +10,8 @@ pub struct Program {
 #[allow(dead_code)]
 pub enum Item {
     Function {
+        /// Optional receiver type for methods: `fn Point.distance(self) { ... }`
+        receiver: Option<String>,
         name: String,
         params: Vec<String>,
         body: Block,

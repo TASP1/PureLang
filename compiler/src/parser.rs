@@ -85,7 +85,15 @@ impl Parser {
 
     fn parse_function(&mut self) -> Result<Item, ParseError> {
         self.expect(Token::Fn)?;
-        let name = self.expect_ident()?;
+        // Support both `fn name(...)` and method form `fn Type.name(...)`
+        let first = self.expect_ident()?;
+        let (receiver, name) = if matches!(self.peek(), Token::Dot) {
+            self.advance(); // consume '.'
+            let method = self.expect_ident()?;
+            (Some(first), method)
+        } else {
+            (None, first)
+        };
         self.expect(Token::LParen)?;
 
         let mut params = Vec::new();
@@ -101,7 +109,12 @@ impl Parser {
         }
         self.expect(Token::RParen)?;
         let body = self.parse_block()?;
-        Ok(Item::Function { name, params, body })
+        Ok(Item::Function {
+            receiver,
+            name,
+            params,
+            body,
+        })
     }
 
     fn parse_struct(&mut self) -> Result<Item, ParseError> {

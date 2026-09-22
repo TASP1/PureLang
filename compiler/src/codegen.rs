@@ -64,16 +64,38 @@ impl Codegen {
                     let fields_ir = fields.iter().map(|_| "i64").collect::<Vec<_>>().join(", ");
                     let _ = writeln!(self.types_ir, "%{} = type {{ {} }}", name, fields_ir);
                 }
-                Item::Function { name, params, .. } => {
-                    self.functions.insert(name.clone(), params.len());
+                Item::Function {
+                    receiver,
+                    name,
+                    params,
+                    ..
+                } => {
+                    // Methods are emitted as StructName_methodname
+                    let full_name = if let Some(recv) = receiver {
+                        format!("{}_{}", recv, name)
+                    } else {
+                        name.clone()
+                    };
+                    self.functions.insert(full_name, params.len());
                 }
             }
         }
 
         let mut funcs = String::new();
         for item in &program.items {
-            if let Item::Function { name, params, body } = item {
-                self.emit_function(name, params, body);
+            if let Item::Function {
+                receiver,
+                name,
+                params,
+                body,
+            } = item
+            {
+                let full_name = if let Some(recv) = receiver {
+                    format!("{}_{}", recv, name)
+                } else {
+                    name.clone()
+                };
+                self.emit_function(&full_name, params, body);
                 funcs.push_str(&self.body);
             }
         }
@@ -165,8 +187,37 @@ impl Codegen {
 
         let is_main = name == "main";
         self.current_is_main = is_main;
+        // Detect method: name like "Point_distance" and first param is receiver (struct ptr)
+        let is_method = name.contains('_') && !params.is_empty();
         if is_main {
             self.body.push_str("define i32 @main() {\nentry:\n");
+        } else if is_method {
+            // First arg is ptr (self), rest i64
+            let mut param_list = vec!["ptr %arg0".to_string()];
+            for i in 1..params.len() {
+                param_list.push(format!("i64 %arg{}", i));
+            }
+            let _ = writeln!(
+                self.body,
+                "define i64 @{}({}) {{",
+                name,
+                param_list.join(", ")
+            );
+            self.body.push_str("entry:\n");
+            // Store self (incoming ptr) into a stack slot so Ident load works uniformly
+            if let Some(first) = params.first() {
+                let ptr = format!("%{}.addr", first);
+                let _ = writeln!(self.body, "  {} = alloca ptr, align 8", ptr);
+                let _ = writeln!(self.body, "  store ptr %arg0, ptr {}, align 8", ptr);
+                self.vars
+                    .insert(first.clone(), (ptr, VarKind::Struct));
+            }
+            for (i, p) in params.iter().enumerate().skip(1) {
+                let ptr = format!("%{}.addr", p);
+                let _ = writeln!(self.body, "  {} = alloca i64, align 8", ptr);
+                let _ = writeln!(self.body, "  store i64 %arg{}, ptr {}, align 8", i, ptr);
+                self.vars.insert(p.clone(), (ptr, VarKind::Number));
+            }
         } else {
             let param_list = params
                 .iter()
@@ -700,6 +751,56 @@ impl Codegen {
                         let _ = writeln!(self.body, "  {} = call i64 @{}({})", res, name, args_ir);
                         return (res, VarKind::Number);
                     }
+                }
+                // Method call: obj.method(args) → call @Struct_method(obj, args...)
+                if let Expr::Field { object, field } = callee.as_ref() {
+                    let (obj_val, obj_kind) = self.emit_expr(object);
+                    if obj_kind != VarKind::Struct {
+                        self.errors
+                            .push("codegen: method call on non-struct".into());
+                        return ("0".into(), VarKind::Number);
+                    }
+                    // Find which struct this method belongs to by scanning registered methods
+                    // We store methods as Struct_method in self.functions
+                    let mut found_name = None;
+                    for (fname, _) in &self.functions {
+                        if fname.ends_with(&format!("_{}", field)) {
+                            found_name = Some(fname.clone());
+                            break;
+                        }
+                    }
+                    if let Some(full_name) = found_name {
+                        let mut arg_vals = vec![obj_val];
+                        for a in args {
+                            let (v, k) = self.emit_expr(a);
+                            if k != VarKind::Number {
+                                self.errors.push(format!(
+                                    "codegen: only Number args supported in method calls for now ({})",
+                                    field
+                                ));
+                            }
+                            arg_vals.push(v);
+                        }
+                        // First arg is ptr (struct), rest i64
+                        let mut args_ir_parts = Vec::new();
+                        if !arg_vals.is_empty() {
+                            args_ir_parts.push(format!("ptr {}", arg_vals[0]));
+                            for v in arg_vals.iter().skip(1) {
+                                args_ir_parts.push(format!("i64 {}", v));
+                            }
+                        }
+                        let args_ir = args_ir_parts.join(", ");
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call i64 @{}({})",
+                            res, full_name, args_ir
+                        );
+                        return (res, VarKind::Number);
+                    }
+                    self.errors
+                        .push(format!("codegen: unknown method '{}'", field));
+                    return ("0".into(), VarKind::Number);
                 }
                 self.errors.push("codegen: unsupported call".into());
                 ("0".into(), VarKind::Number)

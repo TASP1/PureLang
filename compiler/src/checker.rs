@@ -22,6 +22,8 @@ pub struct TypeChecker {
     scopes: Vec<Scope>,
     /// Top-level functions
     functions: HashMap<String, Type>,
+    /// Methods: (StructName, method_name) → Function type (first param is the receiver)
+    methods: HashMap<(String, String), Type>,
     /// Struct name → field names (order matters)
     structs: HashMap<String, Vec<String>>,
     errors: Vec<TypeError>,
@@ -34,6 +36,7 @@ impl TypeChecker {
                 vars: HashMap::new(),
             }],
             functions: HashMap::new(),
+            methods: HashMap::new(),
             structs: HashMap::new(),
             errors: Vec::new(),
         }
@@ -46,16 +49,44 @@ impl TypeChecker {
                 Item::Struct { name, fields } => {
                     self.structs.insert(name.clone(), fields.clone());
                 }
-                Item::Function { name, params, body } => {
-                    let param_tys: Vec<Type> = params.iter().map(|_| Type::Number).collect();
+                Item::Function {
+                    receiver,
+                    name,
+                    params,
+                    body,
+                } => {
                     let ret = Self::infer_return_type(body);
-                    self.functions.insert(
-                        name.clone(),
-                        Type::Function {
-                            params: param_tys,
-                            ret: Box::new(ret),
-                        },
-                    );
+                    if let Some(recv) = receiver {
+                        // Method: first param is the receiver type (Struct)
+                        let mut param_tys: Vec<Type> = vec![Type::Struct(recv.clone())];
+                        for _ in params.iter().skip(1) {
+                            param_tys.push(Type::Number);
+                        }
+                        // If no params at all, still treat as method taking only self
+                        if params.is_empty() {
+                            param_tys = vec![Type::Struct(recv.clone())];
+                        } else if params.len() == 1 {
+                            // single param is the receiver (usually named self)
+                            param_tys = vec![Type::Struct(recv.clone())];
+                        }
+                        self.methods.insert(
+                            (recv.clone(), name.clone()),
+                            Type::Function {
+                                params: param_tys,
+                                ret: Box::new(ret),
+                            },
+                        );
+                    } else {
+                        let param_tys: Vec<Type> =
+                            params.iter().map(|_| Type::Number).collect();
+                        self.functions.insert(
+                            name.clone(),
+                            Type::Function {
+                                params: param_tys,
+                                ret: Box::new(ret),
+                            },
+                        );
+                    }
                 }
             }
         }
@@ -175,14 +206,27 @@ impl TypeChecker {
     fn check_item(&mut self, item: &Item) {
         match item {
             Item::Function {
+                receiver,
                 name: _,
                 params,
                 body,
             } => {
                 self.push_scope();
-                for p in params {
-                    // Parameters are immutable by default; Phase 2: numeric by default
-                    self.declare(p, Type::Number, false);
+                if let Some(recv) = receiver {
+                    // Method: first param is the receiver (struct type)
+                    if let Some(first) = params.first() {
+                        self.declare(first, Type::Struct(recv.clone()), false);
+                        for p in params.iter().skip(1) {
+                            self.declare(p, Type::Number, false);
+                        }
+                    } else {
+                        // no params listed — still allow, but unusual
+                    }
+                } else {
+                    for p in params {
+                        // Parameters are immutable by default; Phase 2: numeric by default
+                        self.declare(p, Type::Number, false);
+                    }
                 }
                 self.check_block(body);
                 self.pop_scope();
@@ -533,6 +577,58 @@ impl TypeChecker {
                 }
             }
             return Type::Struct(name.clone());
+        }
+
+        // Method call: obj.method(args)  →  Call { callee: Field { object, field }, args }
+        if let Expr::Field { object, field } = callee {
+            let obj_ty = self.check_expr(object);
+            if let Type::Struct(struct_name) = &obj_ty {
+                if let Some(method_ty) = self.methods.get(&(struct_name.clone(), field.clone())) {
+                    let method_ty = method_ty.clone();
+                    let arg_tys: Vec<Type> = args.iter().map(|a| self.check_expr(a)).collect();
+                    // method params = [receiver] + extra args
+                    if let Type::Function { params, ret } = method_ty {
+                        let expected_extra = if params.is_empty() {
+                            0
+                        } else {
+                            params.len() - 1
+                        };
+                        if arg_tys.len() != expected_extra {
+                            self.error(format!(
+                                "Method '{}.{}' expects {} arguments, found {}",
+                                struct_name,
+                                field,
+                                expected_extra,
+                                arg_tys.len()
+                            ));
+                        }
+                        // type-check extra args against params[1..]
+                        for (i, (p, a)) in params.iter().skip(1).zip(arg_tys.iter()).enumerate() {
+                            if *p != Type::Unknown && *a != Type::Unknown && p != a {
+                                self.error(format!(
+                                    "Argument {} type mismatch: expected {}, found {}",
+                                    i + 1,
+                                    p,
+                                    a
+                                ));
+                            }
+                        }
+                        return *ret;
+                    }
+                } else {
+                    self.error(format!(
+                        "No method '{}' found for type '{}'",
+                        field, struct_name
+                    ));
+                    return Type::Unknown;
+                }
+            } else if obj_ty != Type::Unknown {
+                self.error(format!(
+                    "Cannot call method '{}' on non-struct type {}",
+                    field, obj_ty
+                ));
+                return Type::Unknown;
+            }
         }
 
         let callee_ty = self.check_expr(callee);

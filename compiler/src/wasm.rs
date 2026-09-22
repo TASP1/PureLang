@@ -38,7 +38,12 @@ impl WasmCodegen {
     pub fn generate(&mut self, program: &Program) -> Result<String, Vec<String>> {
         // Reserve local 0 as scratch in main; we'll declare properly per function
         for item in &program.items {
-            if let Item::Function { name, params, body } = item
+            if let Item::Function {
+                receiver: _,
+                name,
+                params,
+                body,
+            } = item
                 && name == "main"
             {
                 self.emit_main(params, body);
