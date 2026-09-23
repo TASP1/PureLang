@@ -1,0 +1,12 @@
+// File I/O stdlib: write_file, read_file, file_exists
+
+fn main() {
+    n = write_file("purelang_test.txt", "Hello from PureLang file I/O")
+    print n
+    print file_exists("purelang_test.txt")
+    content = read_file("purelang_test.txt")
+    print content
+    print file_exists("no_such_file_xyz.pure")
+    print write_file("purelang_test2.txt", "second file")
+    print read_file("purelang_test2.txt")
+}

@@ -282,6 +282,16 @@ impl Codegen {
         self.preamble
             .push_str("declare i32 @snprintf(ptr, i64, ptr, ...)\n");
         self.preamble.push_str("declare void @free(ptr)\n");
+        self.preamble.push_str("declare ptr @fopen(ptr, ptr)\n");
+        self.preamble
+            .push_str("declare i64 @fread(ptr, i64, i64, ptr)\n");
+        self.preamble
+            .push_str("declare i64 @fwrite(ptr, i64, i64, ptr)\n");
+        self.preamble.push_str("declare i32 @fclose(ptr)\n");
+        self.preamble
+            .push_str("declare i32 @fseek(ptr, i64, i32)\n");
+        self.preamble.push_str("declare i64 @ftell(ptr)\n");
+        self.preamble.push_str("declare void @rewind(ptr)\n");
         // libm (linked via clang -lm)
         self.preamble.push_str("declare double @fabs(double)\n");
         self.preamble
@@ -1029,6 +1039,163 @@ impl Codegen {
                         let res = self.fresh();
                         let _ = writeln!(self.body, "  {} = fptosi double {} to i64", res, fd);
                         return (res, VarKind::Number);
+                    }
+                    let file_builtin = name.strip_prefix("std_").unwrap_or(name.as_str());
+                    if file_builtin == "read_file" {
+                        if args.len() != 1 {
+                            self.errors.push("codegen: read_file expects 1 arg".into());
+                            return ("0".into(), VarKind::String);
+                        }
+                        let (path, pk) = self.emit_expr(&args[0]);
+                        let path_s = self.ensure_string(path, pk);
+                        let mode = self.intern_string("rb");
+                        let fp = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call ptr @fopen(ptr {}, ptr {})",
+                            fp, path_s, mode
+                        );
+                        let empty = self.intern_string("");
+                        let isnull = self.fresh();
+                        let _ = writeln!(self.body, "  {} = icmp eq ptr {}, null", isnull, fp);
+                        let then_l = self.fresh_label("rf.then");
+                        let else_l = self.fresh_label("rf.else");
+                        let end_l = self.fresh_label("rf.end");
+                        let res_slot = self.fresh();
+                        let _ = writeln!(self.body, "  {} = alloca ptr, align 8", res_slot);
+                        let _ = writeln!(
+                            self.body,
+                            "  br i1 {}, label %{}, label %{}",
+                            isnull, then_l, else_l
+                        );
+                        let _ = writeln!(self.body, "{}:", then_l);
+                        let _ = writeln!(
+                            self.body,
+                            "  store ptr {}, ptr {}, align 8",
+                            empty, res_slot
+                        );
+                        let _ = writeln!(self.body, "  br label %{}", end_l);
+                        let _ = writeln!(self.body, "{}:", else_l);
+                        let _ = writeln!(self.body, "  call i32 @fseek(ptr {}, i64 0, i32 2)", fp);
+                        let sz = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call i64 @ftell(ptr {})", sz, fp);
+                        let _ = writeln!(self.body, "  call void @rewind(ptr {})", fp);
+                        let sz1 = self.fresh();
+                        let _ = writeln!(self.body, "  {} = add i64 {}, 1", sz1, sz);
+                        let buf = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call ptr @malloc(i64 {})", buf, sz1);
+                        let _ = writeln!(
+                            self.body,
+                            "  call i64 @fread(ptr {}, i64 1, i64 {}, ptr {})",
+                            buf, sz, fp
+                        );
+                        let nul = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = getelementptr inbounds i8, ptr {}, i64 {}",
+                            nul, buf, sz
+                        );
+                        let _ = writeln!(self.body, "  store i8 0, ptr {}, align 1", nul);
+                        let _ = writeln!(self.body, "  call i32 @fclose(ptr {})", fp);
+                        let _ =
+                            writeln!(self.body, "  store ptr {}, ptr {}, align 8", buf, res_slot);
+                        let _ = writeln!(self.body, "  br label %{}", end_l);
+                        let _ = writeln!(self.body, "{}:", end_l);
+                        let out = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = load ptr, ptr {}, align 8", out, res_slot);
+                        return (out, VarKind::String);
+                    }
+                    if file_builtin == "write_file" {
+                        if args.len() != 2 {
+                            self.errors
+                                .push("codegen: write_file expects 2 args".into());
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let (path, pk) = self.emit_expr(&args[0]);
+                        let path_s = self.ensure_string(path, pk);
+                        let (content, ck) = self.emit_expr(&args[1]);
+                        let content_s = self.ensure_string(content, ck);
+                        let mode = self.intern_string("wb");
+                        let fp = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call ptr @fopen(ptr {}, ptr {})",
+                            fp, path_s, mode
+                        );
+                        let isnull = self.fresh();
+                        let _ = writeln!(self.body, "  {} = icmp eq ptr {}, null", isnull, fp);
+                        let fail_l = self.fresh_label("wf.fail");
+                        let ok_l = self.fresh_label("wf.ok");
+                        let end_l = self.fresh_label("wf.end");
+                        let res_slot = self.fresh();
+                        let _ = writeln!(self.body, "  {} = alloca i64, align 8", res_slot);
+                        let _ = writeln!(
+                            self.body,
+                            "  br i1 {}, label %{}, label %{}",
+                            isnull, fail_l, ok_l
+                        );
+                        let _ = writeln!(self.body, "{}:", fail_l);
+                        let _ = writeln!(self.body, "  store i64 0, ptr {}, align 8", res_slot);
+                        let _ = writeln!(self.body, "  br label %{}", end_l);
+                        let _ = writeln!(self.body, "{}:", ok_l);
+                        let len = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = call i64 @strlen(ptr {})", len, content_s);
+                        let n = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call i64 @fwrite(ptr {}, i64 1, i64 {}, ptr {})",
+                            n, content_s, len, fp
+                        );
+                        let _ = writeln!(self.body, "  call i32 @fclose(ptr {})", fp);
+                        let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", n, res_slot);
+                        let _ = writeln!(self.body, "  br label %{}", end_l);
+                        let _ = writeln!(self.body, "{}:", end_l);
+                        let out = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = load i64, ptr {}, align 8", out, res_slot);
+                        return (out, VarKind::Number);
+                    }
+                    if file_builtin == "file_exists" {
+                        if args.len() != 1 {
+                            self.errors
+                                .push("codegen: file_exists expects 1 arg".into());
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let (path, pk) = self.emit_expr(&args[0]);
+                        let path_s = self.ensure_string(path, pk);
+                        let mode = self.intern_string("rb");
+                        let fp = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call ptr @fopen(ptr {}, ptr {})",
+                            fp, path_s, mode
+                        );
+                        let isnull = self.fresh();
+                        let _ = writeln!(self.body, "  {} = icmp eq ptr {}, null", isnull, fp);
+                        let yes_l = self.fresh_label("fe.yes");
+                        let no_l = self.fresh_label("fe.no");
+                        let end_l = self.fresh_label("fe.end");
+                        let res_slot = self.fresh();
+                        let _ = writeln!(self.body, "  {} = alloca i64, align 8", res_slot);
+                        let _ = writeln!(
+                            self.body,
+                            "  br i1 {}, label %{}, label %{}",
+                            isnull, no_l, yes_l
+                        );
+                        let _ = writeln!(self.body, "{}:", no_l);
+                        let _ = writeln!(self.body, "  store i64 0, ptr {}, align 8", res_slot);
+                        let _ = writeln!(self.body, "  br label %{}", end_l);
+                        let _ = writeln!(self.body, "{}:", yes_l);
+                        let _ = writeln!(self.body, "  call i32 @fclose(ptr {})", fp);
+                        let _ = writeln!(self.body, "  store i64 1, ptr {}, align 8", res_slot);
+                        let _ = writeln!(self.body, "  br label %{}", end_l);
+                        let _ = writeln!(self.body, "{}:", end_l);
+                        let out = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = load i64, ptr {}, align 8", out, res_slot);
+                        return (out, VarKind::Number);
                     }
                     if let Some(fields) = self.structs.get(name).cloned() {
                         // alloca struct, store fields

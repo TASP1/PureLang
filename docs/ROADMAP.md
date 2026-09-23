@@ -56,6 +56,7 @@
 ## Phase 4 — Standard Library & Tooling
 
 - [x] Math helpers (abs, min, max, pow, sqrt, floor, ceil, round, sin, cos, tan, log, exp)
+- [x] File I/O (`read_file`, `write_file`, `file_exists`)
 - Core collections (Vec, Map, etc.) — partial (List built-in)
 - File I/O, networking, concurrency primitives
 - Formatter (`pure fmt`)

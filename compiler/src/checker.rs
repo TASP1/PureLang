@@ -87,6 +87,13 @@ impl TypeChecker {
             ("std_tan", vec![n()], n()),
             ("std_log", vec![n()], n()),
             ("std_exp", vec![n()], n()),
+            // File I/O
+            ("read_file", vec![String], String),
+            ("write_file", vec![String, String], Number),
+            ("file_exists", vec![String], Number),
+            ("std_read_file", vec![String], String),
+            ("std_write_file", vec![String, String], Number),
+            ("std_file_exists", vec![String], Number),
         ];
         for (name, params, ret) in builtins {
             self.functions.insert(
