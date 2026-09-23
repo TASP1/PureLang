@@ -57,6 +57,8 @@
 
 - [x] Math helpers (abs, min, max, pow, sqrt, floor, ceil, round, sin, cos, tan, log, exp)
 - [x] File I/O (`read_file`, `write_file`, `file_exists`)
+- [x] List helpers (`list_len`, `list_get`, `list_sum`)
+- [x] Formatter (`purec --fmt`)
 - Core collections (Vec, Map, etc.) — partial (List built-in)
 - File I/O, networking, concurrency primitives
 - Formatter (`pure fmt`)

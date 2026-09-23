@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.13.0**
+**Compiler:** `purec` **v0.14.0**
 
 ## Quick Example
 
@@ -87,7 +87,7 @@ wasmtime hello.wat
 
 ```
 PureLang/
-├── compiler/                 # purec v0.13.0 (Rust)
+├── compiler/                 # purec v0.14.0 (Rust)
 │   └── src/
 │       ├── main.rs           # CLI
 │       ├── lexer.rs / token.rs

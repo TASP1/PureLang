@@ -1197,6 +1197,99 @@ impl Codegen {
                             writeln!(self.body, "  {} = load i64, ptr {}, align 8", out, res_slot);
                         return (out, VarKind::Number);
                     }
+                    let list_builtin = name.strip_prefix("std_").unwrap_or(name.as_str());
+                    if list_builtin == "list_len" {
+                        if args.len() != 1 {
+                            self.errors.push("codegen: list_len expects 1 arg".into());
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let (lst, lk) = self.emit_expr(&args[0]);
+                        if lk != VarKind::List {
+                            self.errors.push("codegen: list_len expects List".into());
+                        }
+                        let loaded = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = load i64, ptr {}, align 8", loaded, lst);
+                        return (loaded, VarKind::Number);
+                    }
+                    if list_builtin == "list_get" {
+                        if args.len() != 2 {
+                            self.errors.push("codegen: list_get expects 2 args".into());
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let (lst, lk) = self.emit_expr(&args[0]);
+                        let (idx, _) = self.emit_expr(&args[1]);
+                        if lk != VarKind::List {
+                            self.errors.push("codegen: list_get expects List".into());
+                        }
+                        let off = self.fresh();
+                        let _ = writeln!(self.body, "  {} = add i64 {}, 1", off, idx);
+                        let ep = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = getelementptr inbounds i64, ptr {}, i64 {}",
+                            ep, lst, off
+                        );
+                        let loaded = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", loaded, ep);
+                        return (loaded, VarKind::Number);
+                    }
+                    if list_builtin == "list_sum" {
+                        if args.len() != 1 {
+                            self.errors.push("codegen: list_sum expects 1 arg".into());
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let (lst, lk) = self.emit_expr(&args[0]);
+                        if lk != VarKind::List {
+                            self.errors.push("codegen: list_sum expects List".into());
+                        }
+                        let len = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", len, lst);
+                        let idx = self.fresh();
+                        let _ = writeln!(self.body, "  {} = alloca i64, align 8", idx);
+                        let _ = writeln!(self.body, "  store i64 0, ptr {}, align 8", idx);
+                        let acc = self.fresh();
+                        let _ = writeln!(self.body, "  {} = alloca i64, align 8", acc);
+                        let _ = writeln!(self.body, "  store i64 0, ptr {}, align 8", acc);
+                        let cond = self.fresh_label("lsum.cond");
+                        let body = self.fresh_label("lsum.body");
+                        let end_l = self.fresh_label("lsum.end");
+                        let _ = writeln!(self.body, "  br label %{}", cond);
+                        let _ = writeln!(self.body, "{}:", cond);
+                        let cur = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", cur, idx);
+                        let cmp = self.fresh();
+                        let _ = writeln!(self.body, "  {} = icmp slt i64 {}, {}", cmp, cur, len);
+                        let _ = writeln!(
+                            self.body,
+                            "  br i1 {}, label %{}, label %{}",
+                            cmp, body, end_l
+                        );
+                        let _ = writeln!(self.body, "{}:", body);
+                        let off = self.fresh();
+                        let _ = writeln!(self.body, "  {} = add i64 {}, 1", off, cur);
+                        let ep = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = getelementptr inbounds i64, ptr {}, i64 {}",
+                            ep, lst, off
+                        );
+                        let elem = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", elem, ep);
+                        let a = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", a, acc);
+                        let s = self.fresh();
+                        let _ = writeln!(self.body, "  {} = add i64 {}, {}", s, a, elem);
+                        let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", s, acc);
+                        let n = self.fresh();
+                        let _ = writeln!(self.body, "  {} = add i64 {}, 1", n, cur);
+                        let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", n, idx);
+                        let _ = writeln!(self.body, "  br label %{}", cond);
+                        let _ = writeln!(self.body, "{}:", end_l);
+                        let out = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", out, acc);
+                        return (out, VarKind::Number);
+                    }
                     if let Some(fields) = self.structs.get(name).cloned() {
                         // alloca struct, store fields
                         let ptr = self.fresh();

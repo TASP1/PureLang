@@ -3,6 +3,7 @@
 mod ast;
 mod checker;
 mod codegen;
+mod fmt;
 mod lexer;
 mod parser;
 mod token;
@@ -29,7 +30,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.13.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
+        println!("purec 0.14.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
         return;
     }
 
@@ -75,6 +76,9 @@ fn main() {
                 mode = "wasm";
                 // Do not advance i here — the loop advances once per arg.
                 // Filename is picked up by the non-option arm.
+            }
+            "--fmt" | "--format" => {
+                mode = "fmt";
             }
             s if s.starts_with('-') => {
                 eprintln!("Unknown option: {}", s);
@@ -135,6 +139,20 @@ fn main() {
             process::exit(1);
         }
     };
+
+    if mode == "fmt" {
+        let formatted = fmt::format_program(&program);
+        if let Some(out) = output {
+            fs::write(out, &formatted).unwrap_or_else(|e| {
+                eprintln!("Failed to write {}: {}", out, e);
+                process::exit(1);
+            });
+            println!("Formatted → {}", out);
+        } else {
+            print!("{}", formatted);
+        }
+        return;
+    }
 
     if mode == "ast" {
         println!("=== PureLang AST ===");
@@ -280,7 +298,7 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.13.0");
+    eprintln!("PureLang Compiler (purec) v0.14.0");
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  purec <file.pure>                 Type-check");
@@ -290,6 +308,7 @@ fn print_usage() {
     eprintln!("  purec --opt <0|1|2|3|s> ...       Optimization level (default: 2)");
     eprintln!("  purec --emit-ir <file.pure>       Print LLVM IR");
     eprintln!("  purec --emit-wasm <file.pure>     Emit WebAssembly (.wat / WASI)");
+    eprintln!("  purec --fmt <file.pure>           Format source (pretty-print)");
     eprintln!("  purec --ast <file.pure>           Show AST");
     eprintln!("  purec --tokens <file.pure>        Show tokens");
     eprintln!("  purec --version");

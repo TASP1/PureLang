@@ -1,0 +1,9 @@
+// List helpers: list_len, list_get, list_sum
+
+fn main() {
+    nums = [10, 20, 30, 40]
+    print list_len(nums)
+    print list_get(nums, 0)
+    print list_get(nums, 3)
+    print list_sum(nums)
+}

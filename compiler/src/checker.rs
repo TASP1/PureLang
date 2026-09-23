@@ -94,6 +94,13 @@ impl TypeChecker {
             ("std_read_file", vec![String], String),
             ("std_write_file", vec![String, String], Number),
             ("std_file_exists", vec![String], Number),
+            // List helpers
+            ("list_len", vec![List(Box::new(Number))], Number),
+            ("list_sum", vec![List(Box::new(Number))], Number),
+            ("list_get", vec![List(Box::new(Number)), Number], Number),
+            ("std_list_len", vec![List(Box::new(Number))], Number),
+            ("std_list_sum", vec![List(Box::new(Number))], Number),
+            ("std_list_get", vec![List(Box::new(Number)), Number], Number),
         ];
         for (name, params, ret) in builtins {
             self.functions.insert(
