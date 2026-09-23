@@ -59,6 +59,9 @@
 - [x] File I/O (`read_file`, `write_file`, `file_exists`)
 - [x] List helpers (`list_len`, `list_get`, `list_sum`)
 - [x] Formatter (`purec --fmt`)
+- [x] Language Server (`purec --lsp`)
+- [x] Package manager foundation (`purec pkg`)
+- [x] Platform presets (android/ios/console/…)
 - Core collections (Vec, Map, etc.) — partial (List built-in)
 - File I/O, networking, concurrency primitives
 - Formatter (`pure fmt`)

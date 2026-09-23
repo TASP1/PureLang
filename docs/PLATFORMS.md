@@ -67,3 +67,51 @@ You can pass any clang-supported triple with `--target`. You need a matching cla
 ## CI
 
 GitHub Actions runs on **ubuntu-latest**, **windows-latest**, and **macos-latest** (public repo → free minutes). Artifacts upload `purec` for each OS.
+
+
+## `--platform` presets (v0.15+)
+
+```bash
+purec --list-platforms
+purec --compile --platform android -o libapp.so app.pure   # needs ANDROID_NDK
+purec --compile --platform ios -o app.o app.pure           # needs Xcode (macOS)
+purec --compile --platform console -o game app.pure
+```
+
+Environment:
+
+| Variable | Purpose |
+|----------|---------|
+| `ANDROID_NDK` | NDK root; purec auto-adds matching llvm sysroot when present |
+| `PUREC_SYSROOT` | Explicit clang `--sysroot` for any cross target |
+
+## Language Server
+
+```bash
+purec --lsp
+```
+
+stdio JSON-RPC. Supports `initialize`, `textDocument/didOpen`, `didChange`, `publishDiagnostics`, `hover`.
+
+VS Code: point a generic LSP client at `purec --lsp`.
+
+## Package manager
+
+```bash
+purec pkg init myapp
+purec pkg add path:../utils
+purec pkg list
+purec pkg build          # compiles entry from Pure.toml
+```
+
+`Pure.toml` example:
+
+```toml
+[package]
+name = "myapp"
+version = "0.1.0"
+entry = "src/main.pure"
+
+[dependencies]
+utils = { path = "../utils" }
+```

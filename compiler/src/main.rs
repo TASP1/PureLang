@@ -5,7 +5,10 @@ mod checker;
 mod codegen;
 mod fmt;
 mod lexer;
+mod lsp;
 mod parser;
+mod pkg;
+mod platforms;
 mod token;
 mod types;
 mod wasm;
@@ -30,7 +33,20 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.14.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
+        println!("purec 0.15.0 (PureLang — multi-platform, LSP, package manager)");
+        return;
+    }
+
+    if args[1] == "pkg" {
+        pkg::run(&args[2..]);
+        return;
+    }
+    if args[1] == "--lsp" || args[1] == "lsp" {
+        lsp::run();
+        return;
+    }
+    if args[1] == "--list-platforms" {
+        println!("{}", platforms::list_platforms());
         return;
     }
 
@@ -64,6 +80,19 @@ fn main() {
                 i += 1;
                 if i < args.len() {
                     target = Some(args[i].clone());
+                }
+            }
+            "--platform" => {
+                i += 1;
+                if i < args.len() {
+                    if let Some(spec) = platforms::resolve_platform(&args[i]) {
+                        target = Some(spec.triple.to_string());
+                        eprintln!("platform: {} ({}) — {}", spec.name, spec.triple, spec.notes);
+                    } else {
+                        eprintln!("Unknown platform: {}", args[i]);
+                        eprintln!("Available: {}", platforms::list_platforms());
+                        process::exit(1);
+                    }
                 }
             }
             "--opt" | "-O" => {
@@ -264,6 +293,31 @@ fn main() {
     }
     // Explicit target when cross-compiling or for consistency
     cmd.arg(format!("--target={}", triple));
+    if triple.contains("android") {
+        cmd.args(["-shared", "-fPIC"]);
+    }
+    if triple.contains("ios") {
+        // Object-friendly; full link needs xcrun on macOS
+        cmd.arg("-c");
+    }
+    if let Ok(sysroot) = std::env::var("PUREC_SYSROOT") {
+        cmd.arg(format!("--sysroot={}", sysroot));
+    } else if let Ok(ndk) = std::env::var("ANDROID_NDK") {
+        if triple.contains("android") {
+            // Common NDK llvm sysroot layout (linux host)
+            let candidates = [
+                format!("{}/toolchains/llvm/prebuilt/linux-x86_64/sysroot", ndk),
+                format!("{}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot", ndk),
+                format!("{}/toolchains/llvm/prebuilt/windows-x86_64/sysroot", ndk),
+            ];
+            for c in &candidates {
+                if std::path::Path::new(c).exists() {
+                    cmd.arg(format!("--sysroot={}", c));
+                    break;
+                }
+            }
+        }
+    }
     cmd.arg("-o").arg(&bin_path).arg(&ir_path);
 
     let status = cmd.status();
@@ -298,7 +352,7 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.14.0");
+    eprintln!("PureLang Compiler (purec) v0.15.0");
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  purec <file.pure>                 Type-check");
@@ -309,6 +363,10 @@ fn print_usage() {
     eprintln!("  purec --emit-ir <file.pure>       Print LLVM IR");
     eprintln!("  purec --emit-wasm <file.pure>     Emit WebAssembly (.wat / WASI)");
     eprintln!("  purec --fmt <file.pure>           Format source (pretty-print)");
+    eprintln!("  purec --platform <name> ...       android|ios|linux|macos|windows|console|...");
+    eprintln!("  purec --list-platforms            List platform presets");
+    eprintln!("  purec --lsp                       Run language server (stdio)");
+    eprintln!("  purec pkg <init|add|list|build>   Package manager");
     eprintln!("  purec --ast <file.pure>           Show AST");
     eprintln!("  purec --tokens <file.pure>        Show tokens");
     eprintln!("  purec --version");
