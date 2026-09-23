@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.17.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.18.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
@@ -352,7 +352,7 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.17.0");
+    eprintln!("PureLang Compiler (purec) v0.18.0");
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  purec <file.pure>                 Type-check");
@@ -505,8 +505,8 @@ fn print_item(item: &Item, level: usize) {
 
 fn print_block(block: &Block, level: usize) {
     println!("{}Block", indent(level));
-    for stmt in &block.statements {
-        print_stmt(stmt, level + 1);
+    for node in &block.statements {
+        print_stmt(&node.stmt, level + 1);
     }
 }
 

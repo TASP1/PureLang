@@ -358,7 +358,13 @@ impl Parser {
 
     // ---------- Statements ----------
 
-    fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_stmt(&mut self) -> Result<StmtNode, ParseError> {
+        let line = self.peek_line();
+        let stmt = self.parse_stmt_inner()?;
+        Ok(StmtNode { line, stmt })
+    }
+
+    fn parse_stmt_inner(&mut self) -> Result<Stmt, ParseError> {
         match self.peek() {
             Token::Print => {
                 self.advance();

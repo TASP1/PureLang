@@ -35,6 +35,7 @@ pub struct TypeChecker {
     /// Enum name → list of (variant name, payload field count)
     enums: HashMap<String, Vec<(String, usize)>>,
     errors: Vec<TypeError>,
+    current_line: u32,
 }
 
 impl TypeChecker {
@@ -49,6 +50,7 @@ impl TypeChecker {
             structs: HashMap::new(),
             enums: HashMap::new(),
             errors: Vec::new(),
+            current_line: 0,
         };
         tc.register_stdlib();
         tc
@@ -103,6 +105,12 @@ impl TypeChecker {
             ("std_list_get", vec![List(Box::new(Number)), Number], Number),
             ("str_len", vec![String], Number),
             ("std_str_len", vec![String], Number),
+            ("list_max", vec![List(Box::new(Number))], Number),
+            ("list_min", vec![List(Box::new(Number))], Number),
+            ("str_is_empty", vec![String], Number),
+            ("std_list_max", vec![List(Box::new(Number))], Number),
+            ("std_list_min", vec![List(Box::new(Number))], Number),
+            ("std_str_is_empty", vec![String], Number),
         ];
         for (name, params, ret) in builtins {
             self.functions.insert(
@@ -284,7 +292,13 @@ impl TypeChecker {
     }
 
     fn error(&mut self, msg: impl Into<String>) {
-        self.errors.push(TypeError::new(msg));
+        let msg = msg.into();
+        let message = if self.current_line > 0 {
+            format!("line {}: {}", self.current_line, msg)
+        } else {
+            msg
+        };
+        self.errors.push(TypeError::new(message));
     }
 
     fn push_scope(&mut self) {
@@ -433,8 +447,8 @@ impl TypeChecker {
     fn infer_return_type(body: &Block) -> Type {
         fn from_block(block: &Block) -> Type {
             let mut found = Type::Void;
-            for stmt in &block.statements {
-                match stmt {
+            for node in &block.statements {
+                match &node.stmt {
                     Stmt::Return(Some(expr)) => {
                         found = expr_ty_hint(expr);
                     }
@@ -546,13 +560,15 @@ impl TypeChecker {
 
     fn check_block(&mut self, block: &Block) {
         self.push_scope();
-        for stmt in &block.statements {
-            self.check_stmt(stmt);
+        for node in &block.statements {
+            self.check_stmt(node);
         }
         self.pop_scope();
     }
 
-    fn check_stmt(&mut self, stmt: &Stmt) {
+    fn check_stmt(&mut self, node: &StmtNode) {
+        self.current_line = node.line;
+        let stmt = &node.stmt;
         match stmt {
             Stmt::Let {
                 mutable,
@@ -664,8 +680,8 @@ impl TypeChecker {
                 self.declare(var, element_ty, false);
                 // body is already a Block — but check_block pushes another scope.
                 // That's fine (extra nested scope).
-                for stmt in &body.statements {
-                    self.check_stmt(stmt);
+                for node in &body.statements {
+                    self.check_stmt(node);
                 }
                 self.pop_scope();
             }
@@ -723,8 +739,8 @@ impl TypeChecker {
                         }
                         Pattern::Wildcard => {}
                     }
-                    for stmt in &arm.body.statements {
-                        self.check_stmt(stmt);
+                    for node in &arm.body.statements {
+                        self.check_stmt(node);
                     }
                     self.pop_scope();
                 }

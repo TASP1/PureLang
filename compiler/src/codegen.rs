@@ -452,8 +452,8 @@ impl Codegen {
     }
 
     fn emit_block(&mut self, block: &Block) {
-        for stmt in &block.statements {
-            self.emit_stmt(stmt);
+        for node in &block.statements {
+            self.emit_stmt(&node.stmt);
         }
     }
 
@@ -1299,6 +1299,105 @@ impl Codegen {
                         let _ = writeln!(self.body, "{}:", end_l);
                         let out = self.fresh();
                         let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", out, acc);
+                        return (out, VarKind::Number);
+                    }
+
+                    if list_builtin == "list_max" || list_builtin == "list_min" {
+                        if args.len() != 1 {
+                            self.errors
+                                .push("codegen: list_max/min expects 1 arg".into());
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let (lst, lk) = self.emit_expr(&args[0]);
+                        let is_max = list_builtin == "list_max";
+                        let len = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", len, lst);
+                        let idx = self.fresh();
+                        let _ = writeln!(self.body, "  {} = alloca i64, align 8", idx);
+                        let _ = writeln!(self.body, "  store i64 0, ptr {}, align 8", idx);
+                        let best = self.fresh();
+                        let _ = writeln!(self.body, "  {} = alloca i64, align 8", best);
+                        // init best from first element or 0
+                        let ep0 = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = getelementptr inbounds i64, ptr {}, i64 1",
+                            ep0, lst
+                        );
+                        let e0 = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", e0, ep0);
+                        let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", e0, best);
+                        let _ = writeln!(self.body, "  store i64 1, ptr {}, align 8", idx);
+                        let cond = self.fresh_label("lmm.cond");
+                        let body = self.fresh_label("lmm.body");
+                        let end_l = self.fresh_label("lmm.end");
+                        let _ = writeln!(self.body, "  br label %{}", cond);
+                        let _ = writeln!(self.body, "{}:", cond);
+                        let cur = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", cur, idx);
+                        let cmp = self.fresh();
+                        let _ = writeln!(self.body, "  {} = icmp slt i64 {}, {}", cmp, cur, len);
+                        let _ = writeln!(
+                            self.body,
+                            "  br i1 {}, label %{}, label %{}",
+                            cmp, body, end_l
+                        );
+                        let _ = writeln!(self.body, "{}:", body);
+                        let off = self.fresh();
+                        let _ = writeln!(self.body, "  {} = add i64 {}, 1", off, cur);
+                        let ep = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = getelementptr inbounds i64, ptr {}, i64 {}",
+                            ep, lst, off
+                        );
+                        let elem = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", elem, ep);
+                        let b = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", b, best);
+                        let better = self.fresh();
+                        if is_max {
+                            let _ =
+                                writeln!(self.body, "  {} = icmp sgt i64 {}, {}", better, elem, b);
+                        } else {
+                            let _ =
+                                writeln!(self.body, "  {} = icmp slt i64 {}, {}", better, elem, b);
+                        }
+                        let upd = self.fresh_label("lmm.upd");
+                        let cont = self.fresh_label("lmm.cont");
+                        let _ = writeln!(
+                            self.body,
+                            "  br i1 {}, label %{}, label %{}",
+                            better, upd, cont
+                        );
+                        let _ = writeln!(self.body, "{}:", upd);
+                        let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", elem, best);
+                        let _ = writeln!(self.body, "  br label %{}", cont);
+                        let _ = writeln!(self.body, "{}:", cont);
+                        let n = self.fresh();
+                        let _ = writeln!(self.body, "  {} = add i64 {}, 1", n, cur);
+                        let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", n, idx);
+                        let _ = writeln!(self.body, "  br label %{}", cond);
+                        let _ = writeln!(self.body, "{}:", end_l);
+                        let out = self.fresh();
+                        let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", out, best);
+                        let _ = lk;
+                        return (out, VarKind::Number);
+                    }
+                    if list_builtin == "str_is_empty" {
+                        if args.len() != 1 {
+                            self.errors
+                                .push("codegen: str_is_empty expects 1 arg".into());
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let (s, sk) = self.emit_expr(&args[0]);
+                        let sp = self.ensure_string(s, sk);
+                        let n = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call i64 @strlen(ptr {})", n, sp);
+                        let z = self.fresh();
+                        let _ = writeln!(self.body, "  {} = icmp eq i64 {}, 0", z, n);
+                        let out = self.fresh();
+                        let _ = writeln!(self.body, "  {} = zext i1 {} to i64", out, z);
                         return (out, VarKind::Number);
                     }
                     if let Some(fields) = self.structs.get(name).cloned() {

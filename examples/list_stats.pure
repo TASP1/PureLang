@@ -1,0 +1,7 @@
+fn main() {
+    nums = [3, 9, 1, 7]
+    print list_max(nums)
+    print list_min(nums)
+    print str_is_empty("")
+    print str_is_empty("x")
+}

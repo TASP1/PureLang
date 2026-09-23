@@ -104,8 +104,8 @@ impl WasmCodegen {
     }
 
     fn emit_block(&mut self, block: &Block) {
-        for stmt in &block.statements {
-            self.emit_stmt(stmt);
+        for node in &block.statements {
+            self.emit_stmt(&node.stmt);
         }
     }
 

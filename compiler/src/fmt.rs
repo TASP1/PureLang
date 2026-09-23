@@ -172,8 +172,8 @@ fn format_item(item: &Item, out: &mut String, level: usize) {
 }
 
 fn format_block(block: &Block, out: &mut String, level: usize) {
-    for stmt in &block.statements {
-        format_stmt(stmt, out, level);
+    for node in &block.statements {
+        format_stmt(&node.stmt, out, level);
     }
 }
 

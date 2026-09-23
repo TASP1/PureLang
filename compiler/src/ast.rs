@@ -76,7 +76,14 @@ pub struct EnumVariant {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub struct Block {
-    pub statements: Vec<Stmt>,
+    pub statements: Vec<StmtNode>,
+}
+
+/// Statement with source line (1-based)
+#[derive(Debug, Clone, PartialEq)]
+pub struct StmtNode {
+    pub line: u32,
+    pub stmt: Stmt,
 }
 
 #[derive(Debug, Clone, PartialEq)]

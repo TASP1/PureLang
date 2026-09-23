@@ -4,7 +4,7 @@
 
 The PureLang compiler is **`purec`**, written in Rust.
 
-**Current version: v0.17.0**
+**Current version: v0.18.0**
 
 Pipeline:
 
