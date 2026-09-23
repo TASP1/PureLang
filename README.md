@@ -13,7 +13,7 @@
 ## Quick Example
 
 ```pure
-fn add(a, b) {
+fn add(a: Number, b: Number) {
     return a + b
 }
 
@@ -22,15 +22,17 @@ struct Point {
     y
 }
 
+fn Point.sum(self) {
+    return self.x + self.y
+}
+
 fn main() {
     print add(40, 2)
-
     p = Point(3, 4)
-    print p.x + p.y
-
+    print p.sum()
     nums = [10, 20, 30]
     print nums.length
-    print nums[0]
+    print sqrt(49)
 }
 ```
 
@@ -38,31 +40,25 @@ fn main() {
 
 ### Done
 - [x] Public repository & design documents
-- [x] **Lexer**
-- [x] **Parser + AST**
-- [x] **Type & ownership checker** (MVP)
+- [x] **Lexer / Parser / AST**
+- [x] **Type checker + ownership / borrows**
 - [x] **LLVM codegen** → native binaries (`clang`)
 - [x] **WebAssembly** (WASI `.wat`)
-- [x] **Functions** (define, call, return)
-- [x] **Structs** (declare, construct, fields)
-- [x] **Lists** (literal, `.length`, indexing, `for x in list`)
-- [x] **Methods** (`fn Point.sum(self)` + `p.sum()`)
+- [x] **Functions** (define, call, return, typed params)
+- [x] **Structs** + **methods** (`fn Point.sum(self)`)
+- [x] **Lists** (literal, `.length`, index, `for x in list`)
 - [x] **Enums + match**
-- [x] **Modules**
-- [x] **Visibility**
-- [x] **Standard library** (math: abs, min, max, pow, sqrt, … + `std.*`) (`pub` required to call across modules)
-- [x] **Traits** (`trait` / `impl Trait for Type`)
-- [x] **Generics** (`fn id[T](x: T)`) (`mod math { ... }` → `math.add()`)
-- [x] **Error handling** (`expr?` on Result/Option enums)
-- [x] **Typed params** (`fn f(x: Number, p: Point)`)
-- [x] **Ownership / borrows** (move non-Copy; field/print/for/method borrow)
-- [x] CI on **public** GitHub Actions (free unlimited minutes)
+- [x] **Modules** + **visibility** (`pub`)
+- [x] **Traits** + **generics**
+- [x] **Error handling** (`?`)
+- [x] **Stdlib math** (`abs`, `min`, `max`, `pow`, `sqrt`, … + `std.*`)
+- [x] CI on **public** GitHub Actions (free minutes + Rust cache)
 
 ### Next
-- [ ] Formatter / LSP
 - [ ] File I/O & richer collections
-- [ ] Standard library
-- [ ] Formatter / LSP
+- [ ] Formatter (`pure fmt`) / LSP
+- [ ] Cross-compilation & optimizations
+- [ ] Package manager foundation
 
 ## Try it
 
@@ -73,20 +69,15 @@ git clone https://github.com/TASP1/PureLang.git
 cd PureLang/compiler
 cargo build --release
 
-# Type-check
 cargo run --release -- ../examples/hello.pure
+cargo run --release -- --compile -o hello ../examples/hello.pure && ./hello
 
-# Native binary
-cargo run --release -- --compile -o hello ../examples/hello.pure
-./hello
+# More examples
+for f in funcs structs lists list_loop methods enums ownership \
+         typed_params try_op modules generics traits visibility stdlib; do
+  cargo run --release -- --compile -o /tmp/$f ../examples/$f.pure && /tmp/$f
+done
 
-# Functions / structs / lists
-cargo run --release -- --compile -o funcs ../examples/funcs.pure && ./funcs
-cargo run --release -- --compile -o structs ../examples/structs.pure && ./structs
-cargo run --release -- --compile -o lists ../examples/lists.pure && ./lists
-cargo run --release -- --compile -o list_loop ../examples/list_loop.pure && ./list_loop
-
-# WebAssembly
 cargo run --release -- --emit-wasm ../examples/hello.pure
 wasmtime hello.wat
 ```
@@ -95,28 +86,22 @@ wasmtime hello.wat
 
 ```
 PureLang/
-├── compiler/           # purec (Rust)
+├── compiler/                 # purec v0.11.0 (Rust)
 │   └── src/
-│       ├── main.rs     # CLI
+│       ├── main.rs           # CLI
 │       ├── lexer.rs / token.rs
 │       ├── parser.rs / ast.rs
 │       ├── types.rs / checker.rs
-│       ├── codegen.rs  # LLVM IR → native
-│       └── wasm.rs     # WASI .wat
+│       ├── codegen.rs        # LLVM IR → native
+│       └── wasm.rs           # WASI .wat
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── SYNTAX.md
 │   ├── MEMORY_MODEL.md
 │   ├── COMPILER.md
 │   └── ROADMAP.md
-├── examples/
-│   ├── hello.pure
-│   ├── game_loop.pure
-│   ├── funcs.pure
-│   ├── structs.pure
-│   ├── lists.pure
-│   └── list_loop.pure
-└── .github/workflows/ci.yml
+├── examples/                 # 17 .pure programs
+└── .github/workflows/ci.yml  # public free Actions + rust-cache
 ```
 
 ## Documentation

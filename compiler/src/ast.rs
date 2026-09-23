@@ -107,10 +107,7 @@ pub enum Stmt {
     /// `return` or `return expr`
     Return(Option<Expr>),
     /// `match expr { Pattern => block ... }`
-    Match {
-        expr: Expr,
-        arms: Vec<MatchArm>,
-    },
+    Match { expr: Expr, arms: Vec<MatchArm> },
     /// Expression statement
     Expr(Expr),
 }

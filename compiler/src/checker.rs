@@ -100,7 +100,6 @@ impl TypeChecker {
         }
     }
 
-
     /// Flatten `mod name { fn foo }` into functions named `name_foo`.
     fn flatten_items(items: &[Item]) -> Vec<Item> {
         let mut out = Vec::new();
@@ -153,9 +152,7 @@ impl TypeChecker {
                     }
                 }
                 Item::Impl {
-                    type_name,
-                    methods,
-                    ..
+                    type_name, methods, ..
                 } => {
                     for m in methods {
                         if let Item::Function {
@@ -190,10 +187,18 @@ impl TypeChecker {
         // First pass: register structs, enums and function signatures
         for item in &flat {
             match item {
-                Item::Struct { name, fields, is_pub: _ } => {
+                Item::Struct {
+                    name,
+                    fields,
+                    is_pub: _,
+                } => {
                     self.structs.insert(name.clone(), fields.clone());
                 }
-                Item::Enum { name, variants, is_pub: _ } => {
+                Item::Enum {
+                    name,
+                    variants,
+                    is_pub: _,
+                } => {
                     let vs: Vec<(String, usize)> = variants
                         .iter()
                         .map(|v| (v.name.clone(), v.fields.len()))
@@ -217,7 +222,8 @@ impl TypeChecker {
                     if let Some(recv) = receiver {
                         let mut param_tys: Vec<Type> = vec![Type::Struct(recv.clone())];
                         for p in params.iter().skip(1) {
-                            param_tys.push(Self::resolve_annotation_static(p.ty_annotation.as_deref()));
+                            param_tys
+                                .push(Self::resolve_annotation_static(p.ty_annotation.as_deref()));
                         }
                         if params.is_empty() {
                             param_tys = vec![Type::Struct(recv.clone())];
@@ -670,10 +676,7 @@ impl TypeChecker {
                                     ));
                                 }
                             } else if expr_ty != Type::Unknown {
-                                self.error(format!(
-                                    "Cannot match on non-enum type {}",
-                                    expr_ty
-                                ));
+                                self.error(format!("Cannot match on non-enum type {}", expr_ty));
                             }
                             if let Some(variants) = self.enums.get(enum_name) {
                                 if let Some((_, nfields)) =
@@ -767,10 +770,7 @@ impl TypeChecker {
                                 return Type::Unknown;
                             }
                         } else {
-                            self.error(format!(
-                                "Enum '{}' has no variant '{}'",
-                                enum_name, field
-                            ));
+                            self.error(format!("Enum '{}' has no variant '{}'", enum_name, field));
                             return Type::Unknown;
                         }
                     }
@@ -823,9 +823,9 @@ impl TypeChecker {
                     Type::Enum(name) => {
                         // Convention: Ok/Some has payload, Err/None does not
                         if let Some(variants) = self.enums.get(&name) {
-                            let has_ok = variants.iter().any(|(v, n)| {
-                                (v == "Ok" || v == "Some") && *n > 0
-                            });
+                            let has_ok = variants
+                                .iter()
+                                .any(|(v, n)| (v == "Ok" || v == "Some") && *n > 0);
                             if !has_ok {
                                 self.error(format!(
                                     "'?' requires enum '{}' to have Ok(value) or Some(value) variant",
@@ -964,7 +964,6 @@ impl TypeChecker {
             }
         }
 
-
         // Module path call: math.add(1, 2) → function math_add
         if let Expr::Field { object, field } = callee {
             if let Expr::Ident(mod_name) = object.as_ref() {
@@ -990,7 +989,9 @@ impl TypeChecker {
                             if *p != Type::Unknown && *a != Type::Unknown && p != a {
                                 self.error(format!(
                                     "Argument {} type mismatch: expected {}, found {}",
-                                    i + 1, p, a
+                                    i + 1,
+                                    p,
+                                    a
                                 ));
                             }
                         }

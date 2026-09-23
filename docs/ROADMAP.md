@@ -13,7 +13,7 @@
 
 > **Note:** PureLang is a **public** repository. CI uses free public GitHub Actions minutes (does not consume private-repo Actions quotas).
 
-## Phase 1 — Minimal Viable Compiler (In Progress)
+## Phase 1 — Minimal Viable Compiler (Complete)
 
 **Goal**: Tokenize → Parse → Generate simple native code
 
@@ -45,7 +45,7 @@
 ## Phase 3 — Performance & Platforms
 
 - Full LLVM optimization pipeline
-- WebAssembly + WASI target
+- [x] WebAssembly + WASI target (basic)
 - Cross-compilation (Windows, macOS, Linux, iOS, Android)
 - Console targets (via platform SDKs + C ABI)
 - SIMD and data-oriented design helpers

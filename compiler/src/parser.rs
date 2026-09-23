@@ -180,7 +180,11 @@ impl Parser {
             }
         }
         self.expect(Token::RBrace)?;
-        Ok(Item::Struct { name, fields, is_pub })
+        Ok(Item::Struct {
+            name,
+            fields,
+            is_pub,
+        })
     }
 
     fn parse_enum(&mut self, is_pub: bool) -> Result<Item, ParseError> {
@@ -216,7 +220,11 @@ impl Parser {
             }
         }
         self.expect(Token::RBrace)?;
-        Ok(Item::Enum { name, variants, is_pub })
+        Ok(Item::Enum {
+            name,
+            variants,
+            is_pub,
+        })
     }
 
     fn parse_module(&mut self, is_pub: bool) -> Result<Item, ParseError> {
@@ -228,9 +236,12 @@ impl Parser {
             items.push(self.parse_item()?);
         }
         self.expect(Token::RBrace)?;
-        Ok(Item::Module { name, items, is_pub })
+        Ok(Item::Module {
+            name,
+            items,
+            is_pub,
+        })
     }
-
 
     fn parse_trait(&mut self, is_pub: bool) -> Result<Item, ParseError> {
         self.expect(Token::Trait)?;
@@ -255,7 +266,10 @@ impl Parser {
                     } else {
                         None
                     };
-                    params.push(Param { name: pname, ty_annotation });
+                    params.push(Param {
+                        name: pname,
+                        ty_annotation,
+                    });
                     if matches!(self.peek(), Token::Comma) {
                         self.advance();
                     } else {
@@ -268,10 +282,17 @@ impl Parser {
             if matches!(self.peek(), Token::LBrace) {
                 let _ = self.parse_block()?;
             }
-            methods.push(TraitMethod { name: mname, params });
+            methods.push(TraitMethod {
+                name: mname,
+                params,
+            });
         }
         self.expect(Token::RBrace)?;
-        Ok(Item::Trait { name, methods, is_pub })
+        Ok(Item::Trait {
+            name,
+            methods,
+            is_pub,
+        })
     }
 
     fn parse_impl(&mut self) -> Result<Item, ParseError> {
@@ -293,7 +314,10 @@ impl Parser {
             }
             // Methods in impl are functions with receiver = type_name
             let mut item = self.parse_function(true)?;
-            if let Item::Function { ref mut receiver, .. } = item {
+            if let Item::Function {
+                ref mut receiver, ..
+            } = item
+            {
                 if receiver.is_none() {
                     // Treat first param as self of type_name when defining bare fn in impl
                     *receiver = Some(type_name.clone());

@@ -33,7 +33,13 @@ impl Type {
     pub fn is_copy(&self) -> bool {
         matches!(
             self,
-            Type::Number | Type::Bool | Type::Range | Type::Void | Type::Enum(_) | Type::Generic(_) | Type::Unknown
+            Type::Number
+                | Type::Bool
+                | Type::Range
+                | Type::Void
+                | Type::Enum(_)
+                | Type::Generic(_)
+                | Type::Unknown
         )
     }
 

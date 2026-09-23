@@ -2,67 +2,79 @@
 
 ## Overview
 
-The PureLang compiler is called **`purec`**.
+The PureLang compiler is **`purec`**, written in Rust.
 
-It is written in Rust and currently at **v0.7.0 — Phase 1 complete + Phase 2 in progress (functions, structs, lists)**.
+**Current version: v0.11.0**
 
-## Current Implementation
+Pipeline:
+
+```
+Source (.pure)
+  → Lexer → Parser → AST
+  → Type checker + ownership / borrows
+  → LLVM IR text  →  clang  →  native binary
+  → WASI .wat     →  wasmtime / browsers
+```
+
+## Layout
 
 ```
 compiler/
-├── Cargo.toml
-├── src/
-│   ├── main.rs      # CLI entry point
-│   ├── token.rs     # Token definitions
-│   ├── lexer.rs     # Lexer implementation
-│   ├── ast.rs       # Abstract Syntax Tree
-│   ├── parser.rs    # Recursive-descent parser
-│   ├── types.rs     # Type system
-│   ├── checker.rs   # Type checker + ownership analysis
-│   ├── codegen.rs   # LLVM IR text emitter → clang
-│   └── wasm.rs      # WebAssembly Text (WASI) emitter
+├── Cargo.toml          # purec 0.11.0, edition 2024
+└── src/
+    ├── main.rs         # CLI (--compile, --emit-ir, --emit-wasm, …)
+    ├── token.rs
+    ├── lexer.rs
+    ├── ast.rs
+    ├── parser.rs       # recursive descent + Pratt
+    ├── types.rs
+    ├── checker.rs      # types, ownership, modules, traits, generics
+    ├── codegen.rs      # LLVM IR (opaque pointers) + libm builtins
+    └── wasm.rs         # WebAssembly Text (WASI)
 ```
 
-### What works today
+## Implemented
+
+| Stage | Status |
+|-------|--------|
+| Lexing | ✅ |
+| Parsing → AST | ✅ |
+| Type checking | ✅ |
+| Ownership / borrows (MVP+) | ✅ |
+| LLVM native codegen | ✅ |
+| WASM backend | ✅ |
+| Functions, structs, methods | ✅ |
+| Lists, for-in | ✅ |
+| Enums + match | ✅ |
+| Modules + `pub` | ✅ |
+| Generics + traits | ✅ |
+| `?` on Result/Option-style enums | ✅ |
+| Math stdlib via libm | ✅ |
+
+## CLI
 
 ```bash
-cd compiler
-cargo build
-cargo run -- ../examples/hello.pure
+purec <file.pure>              # type-check
+purec --compile -o out file.pure
+purec --emit-ir file.pure
+purec --emit-wasm file.pure
+purec --ast / --tokens file.pure
 ```
 
-The lexer tokenizes source, the parser builds a full AST, and the type checker enforces types + basic ownership (immutable-by-default, move of non-Copy values).
+## Technology
 
-## Planned Pipeline Stages
+- **Language:** Rust (edition 2024)
+- **Backend:** hand-written LLVM IR text + system `clang` (`-lm` for math)
+- **WASM:** WASI snapshot preview1 text format
+- **CI:** public repo, free Actions minutes, `Swatinem/rust-cache`
 
-1. **Lexing** ← (completed)
-2. **Parsing** → Abstract Syntax Tree (AST) ← (completed)
-3. **Type Checking + Ownership Analysis** ← (completed)
-4. **LLVM IR Code Generation** ← (completed)
-5. **WebAssembly backend** ← (completed)
-6. **Richer stdlib / optimizations**
+## Diagnostics goals
 
-## Technology Choices
+Precise locations, helpful messages, colored context (to be expanded).
 
-- **Language**: Rust
-- **Parsing**: Hand-written recursive descent (starting simple) or parser combinators later
-- **LLVM interop**: `inkwell` or `llvm-sys`
-- **CLI**: Simple argument parsing (will use `clap` later)
+## Next
 
-## Diagnostics Philosophy
-
-Errors should be:
-
-- Precise (exact location)
-- Helpful (suggest fixes when possible)
-- Beautiful (colored, with source context)
-
-## Build Goals
-
-- Single static binary for easy distribution
-- Fast incremental compilation (critical for game development)
-- Excellent cross-compilation support
-
-## Next Immediate Step
-
-Next: methods, enums, full borrow checker, stdlib.
+- File I/O & richer collections in stdlib
+- Formatter / LSP
+- Stronger LLVM optimization pipeline
+- Cross-compilation targets

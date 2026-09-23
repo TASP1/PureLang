@@ -15,59 +15,60 @@ PureLang is a modern systems programming language designed for:
 PureLang Source (.pure)
         │
         ▼
-   Lexer  (implemented)
+   Lexer  ✅
         │
         ▼
-   Parser → AST
+   Parser → AST  ✅
         │
         ▼
-   Type Checker + Ownership / Borrow Checker
+   Type Checker + Ownership / Borrow Checker  ✅
         │
         ▼
-   Intermediate Representation
+   Code generation
         │
         ├──────────────────────┐
         ▼                      ▼
-   LLVM IR                 WebAssembly
+   LLVM IR ✅              WebAssembly ✅
         │                      │
         ▼                      ▼
- Native Binary              .wasm / WASI
- (Desktop, Mobile,         (Browsers + Edge)
-  Consoles)
+ Native Binary              .wat / WASI
+ (Linux today; more         (wasmtime, browsers)
+  targets planned)
 ```
 
 ## Compiler Implementation
 
-- Written entirely in **Rust**
-- Current stage: **Lexer complete**
-- Future stages: Parser → Type/Ownership checking → Code generation
+- Written entirely in **Rust** (`purec` **v0.11.0**)
+- Hand-written recursive-descent parser
+- LLVM IR emitted as text; linked with `clang`
+- Math via **libm** (`-lm`)
 
 ### Why Rust for the compiler?
 
-- The compiler itself benefits from memory safety
-- Excellent ecosystem for parsing and LLVM interop (`inkwell`)
-- Fast and reliable
+- Memory safety for the compiler itself
+- Strong ecosystem and tooling
+- Fast, reliable CI builds with caching
 
 ## Key Design Decisions
 
-| Area                | Decision                                      | Reason |
-|---------------------|-----------------------------------------------|--------|
-| Syntax              | Extremely simple, braces, immutable by default | Ease of use |
-| Memory Safety       | Ownership + borrowing (compile-time)          | Zero-cost safety |
-| Backend             | LLVM + WebAssembly                            | Performance + reach |
-| Interop             | Excellent C ABI                               | Console SDKs, existing libraries |
-| Metaprogramming     | Keep simple at first, expand later            | Avoid complexity |
+| Area            | Decision                         | Reason                |
+|-----------------|----------------------------------|------------------------|
+| Syntax          | Simple, braces, immutable default | Ease of use          |
+| Memory safety   | Ownership + borrowing (compile-time) | Zero-cost safety  |
+| Backend         | LLVM + WebAssembly               | Performance + reach   |
+| Interop         | C ABI (via clang)                | SDKs, existing libs   |
+| Stdlib math     | libm builtins                    | Portable numerics     |
 
 ## Platform Strategy
 
-- **Desktop / Mobile**: Full LLVM native targets
-- **Web**: WebAssembly
-- **Consoles**: Native code + platform SDKs via C interop (requires developer agreements)
+- **Desktop:** LLVM native (Linux working; Windows/macOS planned)
+- **Web:** WebAssembly / WASI
+- **Mobile / consoles:** via C ABI + platform SDKs (future)
 
-## Future Extensibility
+## Extensibility
 
-- Possible MLIR dialect later for advanced GPU / accelerator support
-- Cranelift as a fast debug backend
-- Incremental compilation for rapid game iteration
+- Stronger optimization pipeline
+- Possible Cranelift debug backend
+- Incremental compilation for game-style iteration
 
-This architecture reuses proven infrastructure (LLVM) while focusing innovation on the language design and developer experience.
+This architecture reuses proven infrastructure (LLVM) while focusing innovation on language design and developer experience.

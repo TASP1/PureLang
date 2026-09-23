@@ -330,14 +330,22 @@ fn print_item(item: &Item, level: usize) {
             }
             print_block(body, level + 1);
         }
-        Item::Struct { name, fields, is_pub } => {
+        Item::Struct {
+            name,
+            fields,
+            is_pub,
+        } => {
             let vis = if *is_pub { "pub " } else { "" };
             println!("{}{}Struct {}", indent(level), vis, name);
             for f in fields {
                 println!("{}Field {}", indent(level + 1), f);
             }
         }
-        Item::Enum { name, variants, is_pub } => {
+        Item::Enum {
+            name,
+            variants,
+            is_pub,
+        } => {
             let vis = if *is_pub { "pub " } else { "" };
             println!("{}{}Enum {}", indent(level), vis, name);
             for v in variants {
@@ -353,14 +361,22 @@ fn print_item(item: &Item, level: usize) {
                 }
             }
         }
-        Item::Module { name, items, is_pub } => {
+        Item::Module {
+            name,
+            items,
+            is_pub,
+        } => {
             let vis = if *is_pub { "pub " } else { "" };
             println!("{}{}Mod {}", indent(level), vis, name);
             for it in items {
                 print_item(it, level + 1);
             }
         }
-        Item::Trait { name, methods, is_pub } => {
+        Item::Trait {
+            name,
+            methods,
+            is_pub,
+        } => {
             let vis = if *is_pub { "pub " } else { "" };
             println!("{}{}Trait {}", indent(level), vis, name);
             for m in methods {
@@ -447,13 +463,7 @@ fn print_stmt(stmt: &Stmt, level: usize) {
                         binding,
                     } => {
                         if let Some(b) = binding {
-                            println!(
-                                "{}Arm {}.{}({})",
-                                indent(level + 1),
-                                enum_name,
-                                variant,
-                                b
-                            );
+                            println!("{}Arm {}.{}({})", indent(level + 1), enum_name, variant, b);
                         } else {
                             println!("{}Arm {}.{}", indent(level + 1), enum_name, variant);
                         }

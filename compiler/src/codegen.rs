@@ -111,9 +111,7 @@ impl Codegen {
                     }
                 }
                 Item::Impl {
-                    type_name,
-                    methods,
-                    ..
+                    type_name, methods, ..
                 } => {
                     for m in methods {
                         if let Item::Function {
@@ -150,13 +148,21 @@ impl Codegen {
         // Register structs, enums & functions first
         for item in &flat {
             match item {
-                Item::Struct { name, fields, is_pub: _ } => {
+                Item::Struct {
+                    name,
+                    fields,
+                    is_pub: _,
+                } => {
                     self.structs.insert(name.clone(), fields.clone());
                     // %Point = type { i64, i64, ... }
                     let fields_ir = fields.iter().map(|_| "i64").collect::<Vec<_>>().join(", ");
                     let _ = writeln!(self.types_ir, "%{} = type {{ {} }}", name, fields_ir);
                 }
-                Item::Enum { name, variants, is_pub: _ } => {
+                Item::Enum {
+                    name,
+                    variants,
+                    is_pub: _,
+                } => {
                     let vs: Vec<(String, usize)> = variants
                         .iter()
                         .map(|v| (v.name.clone(), v.fields.len()))
@@ -170,8 +176,6 @@ impl Codegen {
                     receiver,
                     name,
                     params,
-                    type_params: _,
-                    is_pub: _,
                     ..
                 } => {
                     let full_name = if let Some(recv) = receiver {
@@ -274,9 +278,12 @@ impl Codegen {
         self.preamble.push_str("declare void @free(ptr)\n");
         // libm (linked via clang -lm)
         self.preamble.push_str("declare double @fabs(double)\n");
-        self.preamble.push_str("declare double @fmin(double, double)\n");
-        self.preamble.push_str("declare double @fmax(double, double)\n");
-        self.preamble.push_str("declare double @pow(double, double)\n");
+        self.preamble
+            .push_str("declare double @fmin(double, double)\n");
+        self.preamble
+            .push_str("declare double @fmax(double, double)\n");
+        self.preamble
+            .push_str("declare double @pow(double, double)\n");
         self.preamble.push_str("declare double @sqrt(double)\n");
         self.preamble.push_str("declare double @floor(double)\n");
         self.preamble.push_str("declare double @ceil(double)\n");
@@ -367,8 +374,7 @@ impl Codegen {
                 let ptr = format!("%{}.addr", first.name);
                 let _ = writeln!(self.body, "  {} = alloca ptr, align 8", ptr);
                 let _ = writeln!(self.body, "  store ptr %arg0, ptr {}, align 8", ptr);
-                self.vars
-                    .insert(first.name.clone(), (ptr, VarKind::Struct));
+                self.vars.insert(first.name.clone(), (ptr, VarKind::Struct));
             }
             for (i, p) in params.iter().enumerate().skip(1) {
                 let ptr = format!("%{}.addr", p.name);
@@ -651,8 +657,7 @@ impl Codegen {
             Stmt::Match { expr, arms } => {
                 let (val, kind) = self.emit_expr(expr);
                 if kind != VarKind::Enum && kind != VarKind::Number {
-                    self.errors
-                        .push("codegen: match on non-enum value".into());
+                    self.errors.push("codegen: match on non-enum value".into());
                 }
                 // Extract tag: val >> 32
                 let tag = self.fresh();
@@ -664,23 +669,21 @@ impl Codegen {
                 }
                 let default_label = self.fresh_label("match.default");
                 // Build switch
-                let _ = write!(self.body, "  switch i64 {}, label %{} [", tag, default_label);
+                let _ = write!(
+                    self.body,
+                    "  switch i64 {}, label %{} [",
+                    tag, default_label
+                );
                 for (i, arm) in arms.iter().enumerate() {
                     if let Pattern::Variant {
-                        enum_name,
-                        variant,
-                        ..
+                        enum_name, variant, ..
                     } = &arm.pattern
                     {
                         if let Some(variants) = self.enums.get(enum_name) {
                             if let Some((idx, _)) =
                                 variants.iter().enumerate().find(|(_, (v, _))| v == variant)
                             {
-                                let _ = write!(
-                                    self.body,
-                                    " i64 {}, label %{}",
-                                    idx, arm_labels[i]
-                                );
+                                let _ = write!(self.body, " i64 {}, label %{}", idx, arm_labels[i]);
                             }
                         }
                     }
@@ -695,11 +698,7 @@ impl Codegen {
                     } = &arm.pattern
                     {
                         let payload = self.fresh();
-                        let _ = writeln!(
-                            self.body,
-                            "  {} = and i64 {}, 4294967295",
-                            payload, val
-                        );
+                        let _ = writeln!(self.body, "  {} = and i64 {}, 4294967295", payload, val);
                         let ptr = self.fresh(); // unique stack slot per arm
                         let _ = writeln!(self.body, "  {} = alloca i64, align 8", ptr);
                         let _ =
@@ -966,22 +965,29 @@ impl Codegen {
                     let builtin = name.strip_prefix("std_").unwrap_or(name.as_str());
                     let is_math = matches!(
                         builtin,
-                        "abs" | "min" | "max" | "pow" | "sqrt" | "floor" | "ceil"
-                            | "round" | "sin" | "cos" | "tan" | "log" | "exp"
+                        "abs"
+                            | "min"
+                            | "max"
+                            | "pow"
+                            | "sqrt"
+                            | "floor"
+                            | "ceil"
+                            | "round"
+                            | "sin"
+                            | "cos"
+                            | "tan"
+                            | "log"
+                            | "exp"
                     );
                     if is_math {
                         let mut fargs = Vec::new();
                         for a in args {
                             let (v, _) = self.emit_expr(a);
                             let d = self.fresh();
-                            let _ = writeln!(
-                                self.body,
-                                "  {} = sitofp i64 {} to double",
-                                d, v
-                            );
+                            let _ = writeln!(self.body, "  {} = sitofp i64 {} to double", d, v);
                             fargs.push(d);
                         }
-                        let (c_name, nargs) = match builtin {
+                        let (c_name, _nargs) = match builtin {
                             "abs" => ("fabs", 1usize),
                             "min" => ("fmin", 2),
                             "max" => ("fmax", 2),
@@ -997,11 +1003,11 @@ impl Codegen {
                             "exp" => ("exp", 1),
                             _ => ("fabs", 1),
                         };
-                        if fargs.len() != nargs {
+                        if fargs.len() != _nargs {
                             self.errors.push(format!(
                                 "codegen: {} expects {} args, found {}",
                                 builtin,
-                                nargs,
+                                _nargs,
                                 fargs.len()
                             ));
                             return ("0".into(), VarKind::Number);
@@ -1012,17 +1018,10 @@ impl Codegen {
                             .collect::<Vec<_>>()
                             .join(", ");
                         let fd = self.fresh();
-                        let _ = writeln!(
-                            self.body,
-                            "  {} = call double @{}({})",
-                            fd, c_name, args_ir
-                        );
+                        let _ =
+                            writeln!(self.body, "  {} = call double @{}({})", fd, c_name, args_ir);
                         let res = self.fresh();
-                        let _ = writeln!(
-                            self.body,
-                            "  {} = fptosi double {} to i64",
-                            res, fd
-                        );
+                        let _ = writeln!(self.body, "  {} = fptosi double {} to i64", res, fd);
                         return (res, VarKind::Number);
                     }
                     if let Some(fields) = self.structs.get(name).cloned() {
@@ -1047,22 +1046,29 @@ impl Codegen {
                         let builtin = name.strip_prefix("std_").unwrap_or(name);
                         let is_math = matches!(
                             builtin,
-                            "abs" | "min" | "max" | "pow" | "sqrt" | "floor" | "ceil"
-                                | "round" | "sin" | "cos" | "tan" | "log" | "exp"
+                            "abs"
+                                | "min"
+                                | "max"
+                                | "pow"
+                                | "sqrt"
+                                | "floor"
+                                | "ceil"
+                                | "round"
+                                | "sin"
+                                | "cos"
+                                | "tan"
+                                | "log"
+                                | "exp"
                         );
                         if is_math {
                             let mut fargs = Vec::new();
                             for a in args {
                                 let (v, _) = self.emit_expr(a);
                                 let d = self.fresh();
-                                let _ = writeln!(
-                                    self.body,
-                                    "  {} = sitofp i64 {} to double",
-                                    d, v
-                                );
+                                let _ = writeln!(self.body, "  {} = sitofp i64 {} to double", d, v);
                                 fargs.push(d);
                             }
-                            let (c_name, nargs) = match builtin {
+                            let (c_name, _nargs) = match builtin {
                                 "abs" => ("fabs", 1),
                                 "min" => ("fmin", 2),
                                 "max" => ("fmax", 2),
@@ -1078,11 +1084,9 @@ impl Codegen {
                                 "exp" => ("exp", 1),
                                 _ => ("fabs", 1),
                             };
-                            if fargs.len() != nargs {
-                                self.errors.push(format!(
-                                    "codegen: {} expects {} args",
-                                    builtin, nargs
-                                ));
+                            if fargs.len() != _nargs {
+                                self.errors
+                                    .push(format!("codegen: {} expects {} args", builtin, _nargs));
                                 return ("0".into(), VarKind::Number);
                             }
                             let args_ir = fargs
@@ -1097,11 +1101,7 @@ impl Codegen {
                                 fd, c_name, args_ir
                             );
                             let res = self.fresh();
-                            let _ = writeln!(
-                                self.body,
-                                "  {} = fptosi double {} to i64",
-                                res, fd
-                            );
+                            let _ = writeln!(self.body, "  {} = fptosi double {} to i64", res, fd);
                             return (res, VarKind::Number);
                         }
                         let is_ptrs = self
@@ -1140,8 +1140,19 @@ impl Codegen {
                             let builtin = field.as_str();
                             let is_math = matches!(
                                 builtin,
-                                "abs" | "min" | "max" | "pow" | "sqrt" | "floor" | "ceil"
-                                    | "round" | "sin" | "cos" | "tan" | "log" | "exp"
+                                "abs"
+                                    | "min"
+                                    | "max"
+                                    | "pow"
+                                    | "sqrt"
+                                    | "floor"
+                                    | "ceil"
+                                    | "round"
+                                    | "sin"
+                                    | "cos"
+                                    | "tan"
+                                    | "log"
+                                    | "exp"
                             );
                             if is_math {
                                 // reuse by synthesizing Ident call path via recursive pattern
@@ -1149,14 +1160,11 @@ impl Codegen {
                                 for a in args {
                                     let (v, _) = self.emit_expr(a);
                                     let d = self.fresh();
-                                    let _ = writeln!(
-                                        self.body,
-                                        "  {} = sitofp i64 {} to double",
-                                        d, v
-                                    );
+                                    let _ =
+                                        writeln!(self.body, "  {} = sitofp i64 {} to double", d, v);
                                     fargs.push(d);
                                 }
-                                let (c_name, nargs) = match builtin {
+                                let (c_name, _nargs) = match builtin {
                                     "abs" => ("fabs", 1usize),
                                     "min" => ("fmin", 2),
                                     "max" => ("fmax", 2),
@@ -1184,11 +1192,8 @@ impl Codegen {
                                     fd, c_name, args_ir
                                 );
                                 let res = self.fresh();
-                                let _ = writeln!(
-                                    self.body,
-                                    "  {} = fptosi double {} to i64",
-                                    res, fd
-                                );
+                                let _ =
+                                    writeln!(self.body, "  {} = fptosi double {} to i64", res, fd);
                                 return (res, VarKind::Number);
                             }
                         }
@@ -1211,11 +1216,8 @@ impl Codegen {
                             }
                             let args_ir = arg_parts.join(", ");
                             let res = self.fresh();
-                            let _ = writeln!(
-                                self.body,
-                                "  {} = call i64 @{}({})",
-                                res, full, args_ir
-                            );
+                            let _ =
+                                writeln!(self.body, "  {} = call i64 @{}({})", res, full, args_ir);
                             return (res, VarKind::Number);
                         }
                     }
@@ -1235,11 +1237,8 @@ impl Codegen {
                                     }
                                     // pack: (idx << 32) | (payload & 0xFFFFFFFF)
                                     let shifted = self.fresh();
-                                    let _ = writeln!(
-                                        self.body,
-                                        "  {} = shl i64 {}, 32",
-                                        shifted, idx
-                                    );
+                                    let _ =
+                                        writeln!(self.body, "  {} = shl i64 {}, 32", shifted, idx);
                                     let masked = self.fresh();
                                     let _ = writeln!(
                                         self.body,
@@ -1317,11 +1316,7 @@ impl Codegen {
                         {
                             if *nfields == 0 {
                                 let packed = self.fresh();
-                                let _ = writeln!(
-                                    self.body,
-                                    "  {} = shl i64 {}, 32",
-                                    packed, idx
-                                );
+                                let _ = writeln!(self.body, "  {} = shl i64 {}, 32", packed, idx);
                                 return (packed, VarKind::Enum);
                             }
                         }
@@ -1390,11 +1385,7 @@ impl Codegen {
                 }
                 let ok_idx = ok_tag.unwrap_or(0);
                 let is_ok = self.fresh();
-                let _ = writeln!(
-                    self.body,
-                    "  {} = icmp eq i64 {}, {}",
-                    is_ok, tag, ok_idx
-                );
+                let _ = writeln!(self.body, "  {} = icmp eq i64 {}, {}", is_ok, tag, ok_idx);
                 let ok_label = self.fresh_label("try.ok");
                 let err_label = self.fresh_label("try.err");
                 let cont_label = self.fresh_label("try.cont");
@@ -1411,11 +1402,7 @@ impl Codegen {
                 }
                 let _ = writeln!(self.body, "{}:", ok_label);
                 let payload = self.fresh();
-                let _ = writeln!(
-                    self.body,
-                    "  {} = and i64 {}, 4294967295",
-                    payload, val
-                );
+                let _ = writeln!(self.body, "  {} = and i64 {}, 4294967295", payload, val);
                 let _ = writeln!(self.body, "  br label %{}", cont_label);
                 let _ = writeln!(self.body, "{}:", cont_label);
                 // phi not needed if we only reach cont from ok; payload is defined on ok path

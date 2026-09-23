@@ -6,3 +6,13 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+[lints.clippy]
+collapsible_if = "allow"
+if_same_then_else = "allow"
+for_kv_map = "allow"
+useless_format = "allow"
+redundant_pattern = "allow"
+
+[lints.rust]
+dead_code = "allow"
