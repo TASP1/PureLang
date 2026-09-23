@@ -1,38 +1,50 @@
 //! Recursive-descent parser for PureLang
 
 use crate::ast::*;
-use crate::token::Token;
+use crate::token::{Spanned, Token};
 
 pub struct Parser {
-    tokens: Vec<Token>,
+    tokens: Vec<Spanned>,
     pos: usize,
 }
 
 #[derive(Debug)]
 pub struct ParseError {
     pub message: String,
+    pub line: u32,
 }
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Parse error: {}", self.message)
+        if self.line > 0 {
+            write!(f, "Parse error (line {}): {}", self.line, self.message)
+        } else {
+            write!(f, "Parse error: {}", self.message)
+        }
     }
 }
 
 impl std::error::Error for ParseError {}
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+    pub fn new(tokens: Vec<Spanned>) -> Self {
         // Filter out Newline tokens — they are insignificant for parsing
-        let tokens: Vec<Token> = tokens
+        let tokens: Vec<Spanned> = tokens
             .into_iter()
-            .filter(|t| !matches!(t, Token::Newline))
+            .filter(|t| !matches!(t.token, Token::Newline))
             .collect();
         Parser { tokens, pos: 0 }
     }
 
     fn peek(&self) -> &Token {
-        self.tokens.get(self.pos).unwrap_or(&Token::Eof)
+        self.tokens
+            .get(self.pos)
+            .map(|s| &s.token)
+            .unwrap_or(&Token::Eof)
+    }
+
+    fn peek_line(&self) -> u32 {
+        self.tokens.get(self.pos).map(|s| s.line).unwrap_or(0)
     }
 
     fn advance(&mut self) -> Token {
@@ -43,23 +55,26 @@ impl Parser {
         tok
     }
 
+    fn err(&self, message: impl Into<String>) -> ParseError {
+        ParseError {
+            message: message.into(),
+            line: self.peek_line(),
+        }
+    }
+
     fn expect(&mut self, expected: Token) -> Result<(), ParseError> {
         let tok = self.advance();
         if tok == expected {
             Ok(())
         } else {
-            Err(ParseError {
-                message: format!("Expected {:?}, found {:?}", expected, tok),
-            })
+            Err(self.err(format!("Expected {:?}, found {:?}", expected, tok)))
         }
     }
 
     fn expect_ident(&mut self) -> Result<String, ParseError> {
         match self.advance() {
             Token::Identifier(name) => Ok(name),
-            other => Err(ParseError {
-                message: format!("Expected identifier, found {:?}", other),
-            }),
+            other => Err(self.err(format!("Expected identifier, found {:?}", other))),
         }
     }
 
@@ -87,12 +102,10 @@ impl Parser {
             Token::Mod => self.parse_module(is_pub),
             Token::Trait => self.parse_trait(is_pub),
             Token::Impl => self.parse_impl(),
-            other => Err(ParseError {
-                message: format!(
-                    "Expected top-level item (fn, struct, enum, mod, trait, impl), found {:?}",
-                    other
-                ),
-            }),
+            other => Err(self.err(format!(
+                "Expected top-level item (fn, struct, enum, mod, trait, impl), found {:?}",
+                other
+            ))),
         }
     }
 
@@ -633,9 +646,7 @@ impl Parser {
                 self.expect(Token::RBracket)?;
                 Ok(Expr::List(elements))
             }
-            other => Err(ParseError {
-                message: format!("Unexpected token in expression: {:?}", other),
-            }),
+            other => Err(self.err(format!("Unexpected token in expression: {:?}", other))),
         }
     }
 }

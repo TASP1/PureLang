@@ -1,0 +1,4 @@
+fn main() {
+    print str_len("PureLang")
+    print str_len("hi")
+}

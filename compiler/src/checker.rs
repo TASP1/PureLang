@@ -101,6 +101,8 @@ impl TypeChecker {
             ("std_list_len", vec![List(Box::new(Number))], Number),
             ("std_list_sum", vec![List(Box::new(Number))], Number),
             ("std_list_get", vec![List(Box::new(Number)), Number], Number),
+            ("str_len", vec![String], Number),
+            ("std_str_len", vec![String], Number),
         ];
         for (name, params, ret) in builtins {
             self.functions.insert(

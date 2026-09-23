@@ -5,6 +5,7 @@ use crate::token::Token;
 pub struct Lexer {
     input: Vec<char>,
     position: usize,
+    line: u32,
 }
 
 impl Lexer {
@@ -12,6 +13,7 @@ impl Lexer {
         Lexer {
             input: source.chars().collect(),
             position: 0,
+            line: 1,
         }
     }
 
@@ -101,6 +103,7 @@ impl Lexer {
             None => Token::Eof,
             Some('\n') => {
                 self.advance();
+                self.line += 1;
                 Token::Newline
             }
             Some('"') => self.read_string(),
@@ -224,12 +227,19 @@ impl Lexer {
         }
     }
 
-    pub fn tokenize(&mut self) -> Vec<Token> {
+    pub fn tokenize(&mut self) -> Vec<crate::token::Spanned> {
         let mut tokens = Vec::new();
         loop {
+            let line_before = self.line;
             let tok = self.next_token();
             let is_eof = matches!(tok, Token::Eof);
-            tokens.push(tok);
+            // For newline, line already incremented; report the previous line
+            let line = if matches!(tok, Token::Newline) {
+                line_before
+            } else {
+                self.line
+            };
+            tokens.push(crate::token::Spanned::new(tok, line));
             if is_eof {
                 break;
             }

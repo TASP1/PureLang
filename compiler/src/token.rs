@@ -82,3 +82,16 @@ impl Token {
         }
     }
 }
+
+/// Token with source location (1-based line)
+#[derive(Debug, Clone, PartialEq)]
+pub struct Spanned {
+    pub token: Token,
+    pub line: u32,
+}
+
+impl Spanned {
+    pub fn new(token: Token, line: u32) -> Self {
+        Spanned { token, line }
+    }
+}

@@ -1234,6 +1234,17 @@ impl Codegen {
                         let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", loaded, ep);
                         return (loaded, VarKind::Number);
                     }
+                    if list_builtin == "str_len" {
+                        if args.len() != 1 {
+                            self.errors.push("codegen: str_len expects 1 arg".into());
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let (s, sk) = self.emit_expr(&args[0]);
+                        let sp = self.ensure_string(s, sk);
+                        let n = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call i64 @strlen(ptr {})", n, sp);
+                        return (n, VarKind::Number);
+                    }
                     if list_builtin == "list_sum" {
                         if args.len() != 1 {
                             self.errors.push("codegen: list_sum expects 1 arg".into());

@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.16.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.17.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
@@ -150,11 +150,11 @@ fn main() {
 
     if mode == "tokens" {
         println!("=== PureLang Tokens ===");
-        for (i, token) in tokens.iter().enumerate() {
-            if matches!(token, token::Token::Eof) {
-                println!("{:3}: EOF", i);
+        for (i, st) in tokens.iter().enumerate() {
+            if matches!(st.token, token::Token::Eof) {
+                println!("{:3}: EOF (line {})", i, st.line);
             } else {
-                println!("{:3}: {:?}", i, token);
+                println!("{:3}: {:?} (line {})", i, st.token, st.line);
             }
         }
         return;
@@ -352,7 +352,7 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.16.0");
+    eprintln!("PureLang Compiler (purec) v0.17.0");
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  purec <file.pure>                 Type-check");
