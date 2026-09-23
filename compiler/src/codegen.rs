@@ -6,6 +6,7 @@ use std::fmt::Write as _;
 use crate::ast::*;
 
 pub struct Codegen {
+    target_triple: String,
     preamble: String,
     strings_ir: String,
     types_ir: String,
@@ -41,7 +42,12 @@ enum VarKind {
 
 impl Codegen {
     pub fn new() -> Self {
+        Self::with_target(host_triple())
+    }
+
+    pub fn with_target(triple: impl Into<String>) -> Self {
         Codegen {
+            target_triple: triple.into(),
             preamble: String::new(),
             strings_ir: String::new(),
             types_ir: String::new(),
@@ -266,8 +272,8 @@ impl Codegen {
 
     fn emit_preamble(&mut self) {
         self.preamble.push_str("; PureLang → LLVM IR\n");
-        self.preamble
-            .push_str("target triple = \"x86_64-unknown-linux-gnu\"\n\n");
+        let _ = writeln!(self.preamble, "target triple = \"{}\"", self.target_triple);
+        self.preamble.push('\n');
         self.preamble.push_str("declare i32 @printf(ptr, ...)\n");
         self.preamble.push_str("declare ptr @malloc(i64)\n");
         self.preamble.push_str("declare ptr @strcpy(ptr, ptr)\n");
@@ -1481,5 +1487,36 @@ trait F64Ext {
 impl F64Ext for f64 {
     fn to_i64_trunc(self) -> i64 {
         self as i64
+    }
+}
+
+pub fn host_triple() -> String {
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        return "x86_64-unknown-linux-gnu".into();
+    }
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    {
+        return "aarch64-unknown-linux-gnu".into();
+    }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    {
+        return "x86_64-apple-darwin".into();
+    }
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
+        return "arm64-apple-darwin".into();
+    }
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+    {
+        return "x86_64-pc-windows-msvc".into();
+    }
+    #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
+    {
+        return "aarch64-pc-windows-msvc".into();
+    }
+    #[allow(unreachable_code)]
+    {
+        "x86_64-unknown-linux-gnu".into()
     }
 }

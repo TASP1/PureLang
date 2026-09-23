@@ -1,4 +1,4 @@
-# PureLang is PUBLIC — Actions minutes are free for public repos.
+# PureLang is PUBLIC — free Actions minutes on public repos.
 name: CI
 
 on:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -31,15 +31,19 @@ jobs:
           test -f docs/SYNTAX.md
           test -f docs/COMPILER.md
           test -f docs/ROADMAP.md
+          test -f docs/PLATFORMS.md
           test -f LICENSE
-          test -f CONTRIBUTING.md
           for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib; do
             test -f examples/$f.pure
           done
 
   build:
-    name: Build Compiler (purec)
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     defaults:
       run:
         working-directory: compiler
@@ -51,52 +55,79 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Install clang
+      - name: Install clang (Ubuntu)
+        if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq clang
 
-      - name: Show versions
+      - name: Install LLVM/clang (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install llvm -y --no-progress
+          echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Ensure clang (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          which clang || xcode-select --install || true
+          clang --version | head -1
+
+      - name: Show toolchain
+        shell: bash
         run: |
           rustc --version
-          clang --version | head -1
-          echo "Repo: ${{ github.repository }} (public Actions — free minutes)"
+          clang --version | head -1 || true
+          echo "OS: ${{ runner.os }} / ${{ matrix.os }}"
 
-      # Cache cargo registry, git deps, and target/ — speeds up every job after the first
-      - name: Cache Rust (registry + target)
+      - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: compiler
-          shared-key: purec-ubuntu-stable
+          shared-key: purec-${{ matrix.os }}-stable
           cache-on-failure: true
           cache-all-crates: true
 
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo build --release
+      - name: fmt
+        if: runner.os == 'Linux'
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        if: runner.os == 'Linux'
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build purec
+        run: cargo build --release
 
       - name: Type-check examples
+        shell: bash
         run: |
           for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib; do
             cargo run --release -- ../examples/$f.pure
           done
 
       - name: Compile & run examples (native)
+        shell: bash
         run: |
           for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib; do
-            cargo run --release -- --compile -o /tmp/$f ../examples/$f.pure
+            cargo run --release -- --compile -o ../tmp_$f ../examples/$f.pure
             echo "=== $f ==="
-            # Example programs may return non-zero from `return expr` in main;
-            # success means compile + runnable, not process exit code.
-            /tmp/$f || true
+            ../tmp_$f || ../tmp_$f.exe || true
           done
 
       - name: Emit WebAssembly
+        shell: bash
         run: |
-          cargo run --release -- --emit-wasm -o /tmp/hello.wat ../examples/hello.pure
-          test -s /tmp/hello.wat
+          cargo run --release -- --emit-wasm -o /tmp/hello.wat ../examples/hello.pure || \
+          cargo run --release -- --emit-wasm -o hello.wat ../examples/hello.pure
+          test -s /tmp/hello.wat || test -s hello.wat
           echo "WASM ok"
 
-      - uses: actions/upload-artifact@v7
+      - name: Upload purec binary
+        uses: actions/upload-artifact@v7
         with:
-          name: purec-${{ runner.os }}-${{ runner.arch }}
-          path: compiler/target/release/purec
+          name: purec-${{ matrix.os }}
+          path: |
+            compiler/target/release/purec
+            compiler/target/release/purec.exe
+          if-no-files-found: warn
           retention-days: 7

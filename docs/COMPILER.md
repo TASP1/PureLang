@@ -4,7 +4,7 @@
 
 The PureLang compiler is **`purec`**, written in Rust.
 
-**Current version: v0.11.0**
+**Current version: v0.12.0**
 
 Pipeline:
 
@@ -56,6 +56,7 @@ compiler/
 ```bash
 purec <file.pure>              # type-check
 purec --compile -o out file.pure
+purec --target <triple> --opt 3 -o out file.pure
 purec --emit-ir file.pure
 purec --emit-wasm file.pure
 purec --ast / --tokens file.pure

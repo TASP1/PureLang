@@ -44,9 +44,11 @@
 
 ## Phase 3 — Performance & Platforms
 
-- Full LLVM optimization pipeline
+- [x] Host optimization levels (`--opt 0|1|2|3|s`)
 - [x] WebAssembly + WASI target (basic)
-- Cross-compilation (Windows, macOS, Linux, iOS, Android)
+- [x] Native CI: Linux, Windows, macOS
+- [x] `--target` triple + platform-aware clang link
+- Cross-compilation sysroots (iOS, Android) — planned
 - Console targets (via platform SDKs + C ABI)
 - SIMD and data-oriented design helpers
 - Fast incremental compilation

@@ -29,13 +29,15 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.11.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
+        println!("purec 0.12.0 (PureLang — lexer + parser + typecheck + llvm + wasm)");
         return;
     }
 
     let mut mode = "check";
     let mut filename: Option<&str> = None;
     let mut output: Option<&str> = None;
+    let mut target: Option<String> = None;
+    let mut opt_level = "2".to_string();
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -56,6 +58,18 @@ fn main() {
             }
             "--compile" | "-c" => {
                 mode = "compile";
+            }
+            "--target" => {
+                i += 1;
+                if i < args.len() {
+                    target = Some(args[i].clone());
+                }
+            }
+            "--opt" | "-O" => {
+                i += 1;
+                if i < args.len() {
+                    opt_level = args[i].clone();
+                }
             }
             "--emit-wasm" => {
                 mode = "wasm";
@@ -183,7 +197,8 @@ fn main() {
     }
 
     // LLVM Codegen
-    let mut cg = Codegen::new();
+    let triple = target.clone().unwrap_or_else(codegen::host_triple);
+    let mut cg = Codegen::with_target(&triple);
     let ir = match cg.generate(&program) {
         Ok(ir) => ir,
         Err(errors) => {
@@ -220,15 +235,26 @@ fn main() {
         process::exit(1);
     });
 
-    // Compile IR with clang
-    let status = Command::new("clang")
-        .args(["-O2", "-lm", "-o", &bin_path, &ir_path])
-        .status();
+    // Compile IR with clang (platform-aware)
+    let triple = target.unwrap_or_else(codegen::host_triple);
+    let opt_flag = format!("-O{}", opt_level);
+    let mut cmd = Command::new("clang");
+    cmd.arg(&opt_flag);
+    // Math library: libm on Unix; on Windows MSVC math is in the CRT
+    if !triple.contains("windows") {
+        cmd.arg("-lm");
+    }
+    // Explicit target when cross-compiling or for consistency
+    cmd.arg(format!("--target={}", triple));
+    cmd.arg("-o").arg(&bin_path).arg(&ir_path);
 
+    let status = cmd.status();
     match status {
         Ok(s) if s.success() => {
             println!("=== PureLang Compiler ===");
             println!("File: {}", filename);
+            println!("Target: {}", triple);
+            println!("Opt: -O{}", opt_level);
             println!("Type check passed ✓");
             println!("LLVM IR → {}", ir_path);
             println!("Native binary → {}", bin_path);
@@ -236,28 +262,42 @@ fn main() {
         }
         Ok(s) => {
             eprintln!("clang failed with status {}", s);
+            eprintln!("Target was: {}", triple);
             process::exit(1);
         }
         Err(e) => {
             eprintln!("Failed to run clang: {}", e);
-            eprintln!("Install clang/LLVM, or use --emit-ir to only generate IR.");
+            eprintln!("Install clang/LLVM for your platform:");
+            eprintln!("  Linux:   sudo apt install clang");
+            eprintln!("  macOS:   xcode-select --install  (or brew install llvm)");
+            eprintln!(
+                "  Windows: install LLVM from https://llvm.org/ or use winget install LLVM.LLVM"
+            );
+            eprintln!("Or use --emit-ir / --emit-wasm without a native link step.");
             process::exit(1);
         }
     }
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.8.1");
+    eprintln!("PureLang Compiler (purec) v0.12.0");
     eprintln!();
     eprintln!("Usage:");
-    eprintln!("  purec <file.pure>              Type-check");
-    eprintln!("  purec --compile <file.pure>    Compile to native binary");
-    eprintln!("  purec -o <out> <file.pure>     Compile to named binary");
-    eprintln!("  purec --emit-ir <file.pure>    Print LLVM IR");
-    eprintln!("  purec --emit-wasm <file.pure>  Emit WebAssembly (.wat)");
-    eprintln!("  purec --ast <file.pure>        Show AST");
-    eprintln!("  purec --tokens <file.pure>     Show tokens");
+    eprintln!("  purec <file.pure>                 Type-check");
+    eprintln!("  purec --compile <file.pure>       Compile to native binary");
+    eprintln!("  purec -o <out> <file.pure>        Compile to named binary");
+    eprintln!("  purec --target <triple> ...       Target triple (default: host)");
+    eprintln!("  purec --opt <0|1|2|3|s> ...       Optimization level (default: 2)");
+    eprintln!("  purec --emit-ir <file.pure>       Print LLVM IR");
+    eprintln!("  purec --emit-wasm <file.pure>     Emit WebAssembly (.wat / WASI)");
+    eprintln!("  purec --ast <file.pure>           Show AST");
+    eprintln!("  purec --tokens <file.pure>        Show tokens");
     eprintln!("  purec --version");
+    eprintln!();
+    eprintln!("Examples:");
+    eprintln!("  purec --compile -o hello hello.pure");
+    eprintln!("  purec --target x86_64-pc-windows-msvc -o app.exe app.pure");
+    eprintln!("  purec --emit-wasm -o app.wat app.pure");
 }
 
 fn indent(level: usize) -> String {
