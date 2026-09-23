@@ -35,6 +35,8 @@ pub struct TypeChecker {
     /// Enum name → list of (variant name, payload field count)
     enums: HashMap<String, Vec<(String, usize)>>,
     errors: Vec<TypeError>,
+    /// Nesting depth of for/while (break/continue)
+    loop_depth: u32,
     current_line: u32,
 }
 
@@ -50,6 +52,7 @@ impl TypeChecker {
             structs: HashMap::new(),
             enums: HashMap::new(),
             errors: Vec::new(),
+            loop_depth: 0,
             current_line: 0,
         };
         tc.register_stdlib();
@@ -108,6 +111,8 @@ impl TypeChecker {
             ("list_max", vec![List(Box::new(Number))], Number),
             ("list_min", vec![List(Box::new(Number))], Number),
             ("str_is_empty", vec![String], Number),
+            ("assert", vec![Number], Number),
+            ("std_assert", vec![Number], Number),
             ("std_list_max", vec![List(Box::new(Number))], Number),
             ("std_list_min", vec![List(Box::new(Number))], Number),
             ("std_str_is_empty", vec![String], Number),
@@ -468,12 +473,13 @@ impl TypeChecker {
                             }
                         }
                     }
-                    Stmt::For { body, .. } => {
+                    Stmt::For { body, .. } | Stmt::While { body, .. } => {
                         let t = from_block(body);
                         if t != Type::Void {
                             found = t;
                         }
                     }
+                    Stmt::Break | Stmt::Continue => {}
                     _ => {}
                 }
             }
@@ -678,12 +684,28 @@ impl TypeChecker {
                 self.push_scope();
                 // loop variable is immutable by default
                 self.declare(var, element_ty, false);
-                // body is already a Block — but check_block pushes another scope.
-                // That's fine (extra nested scope).
+                self.loop_depth += 1;
                 for node in &body.statements {
                     self.check_stmt(node);
                 }
+                self.loop_depth -= 1;
                 self.pop_scope();
+            }
+            Stmt::While { condition, body } => {
+                let _ = self.check_expr(condition);
+                self.loop_depth += 1;
+                self.check_block(body);
+                self.loop_depth -= 1;
+            }
+            Stmt::Break => {
+                if self.loop_depth == 0 {
+                    self.error("break outside of loop");
+                }
+            }
+            Stmt::Continue => {
+                if self.loop_depth == 0 {
+                    self.error("continue outside of loop");
+                }
             }
             Stmt::Return(opt) => {
                 if let Some(expr) = opt {

@@ -40,7 +40,9 @@
 - [x] Generics (`fn id[T](x: T)`) + traits (`trait` / `impl`)
 - [x] Error handling with `?`
 - [x] Modules (`mod name { ... }` + `name.fn()`)
-- [x] Visibility (`pub` enforced across modules)
+- [x] Visibility
+- [x] while / break / continue
+- [x] assert builtin (`pub` enforced across modules)
 
 ## Phase 3 — Performance & Platforms
 

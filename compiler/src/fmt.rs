@@ -226,6 +226,23 @@ fn format_stmt(stmt: &Stmt, out: &mut String, level: usize) {
             }
             out.push('\n');
         }
+                Stmt::While { condition, body } => {
+            out.push_str(&indent(level));
+            out.push_str("while ");
+            format_expr(condition, out);
+            out.push_str(" {\n");
+            format_block(body, out, level + 1);
+            out.push_str(&indent(level));
+            out.push_str("}\n");
+        }
+        Stmt::Break => {
+            out.push_str(&indent(level));
+            out.push_str("break\n");
+        }
+        Stmt::Continue => {
+            out.push_str(&indent(level));
+            out.push_str("continue\n");
+        }
         Stmt::For {
             var,
             iterable,

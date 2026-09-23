@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.18.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.19.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
@@ -352,7 +352,7 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.18.0");
+    eprintln!("PureLang Compiler (purec) v0.19.0");
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  purec <file.pure>                 Type-check");
@@ -550,6 +550,13 @@ fn print_stmt(stmt: &Stmt, level: usize) {
             print_expr(iterable, level + 1);
             print_block(body, level + 1);
         }
+        Stmt::While { condition, body } => {
+            println!("{}While", indent(level));
+            print_expr(condition, level + 1);
+            print_block(body, level + 1);
+        }
+        Stmt::Break => println!("{}Break", indent(level)),
+        Stmt::Continue => println!("{}Continue", indent(level)),
         Stmt::Return(None) => println!("{}Return", indent(level)),
         Stmt::Return(Some(e)) => {
             println!("{}Return", indent(level));

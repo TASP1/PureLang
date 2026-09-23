@@ -26,6 +26,8 @@ pub struct Codegen {
     enums: HashMap<String, Vec<(String, usize)>>,
     current_is_main: bool,
     errors: Vec<String>,
+    /// (continue_label, break_label)
+    loop_stack: Vec<(String, String)>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -63,6 +65,7 @@ impl Codegen {
             enums: HashMap::new(),
             current_is_main: true,
             errors: Vec::new(),
+            loop_stack: Vec::new(),
         }
     }
 
@@ -282,6 +285,7 @@ impl Codegen {
         self.preamble
             .push_str("declare i32 @snprintf(ptr, i64, ptr, ...)\n");
         self.preamble.push_str("declare void @free(ptr)\n");
+        self.preamble.push_str("declare void @exit(i32)\n");
         self.preamble.push_str("declare ptr @fopen(ptr, ptr)\n");
         self.preamble
             .push_str("declare i64 @fread(ptr, i64, i64, ptr)\n");
@@ -560,7 +564,9 @@ impl Codegen {
 
                     let loop_cond = self.fresh_label("loop.cond");
                     let loop_body = self.fresh_label("loop.body");
+                    let loop_step = self.fresh_label("loop.step");
                     let loop_end = self.fresh_label("loop.end");
+                    self.loop_stack.push((loop_step.clone(), loop_end.clone()));
                     let _ = writeln!(self.body, "  br label %{}", loop_cond);
                     let _ = writeln!(self.body, "{}:", loop_cond);
                     let cur = self.fresh();
@@ -574,6 +580,8 @@ impl Codegen {
                     );
                     let _ = writeln!(self.body, "{}:", loop_body);
                     self.emit_block(body);
+                    let _ = writeln!(self.body, "  br label %{}", loop_step);
+                    let _ = writeln!(self.body, "{}:", loop_step);
                     let cur2 = self.fresh();
                     let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", cur2, ivar);
                     let next = self.fresh();
@@ -581,6 +589,7 @@ impl Codegen {
                     let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", next, ivar);
                     let _ = writeln!(self.body, "  br label %{}", loop_cond);
                     let _ = writeln!(self.body, "{}:", loop_end);
+                    self.loop_stack.pop();
                 } else {
                     // for x in list { ... } — iterate by index
                     let (list_ptr, lkind) = self.emit_expr(iterable);
@@ -601,7 +610,9 @@ impl Codegen {
 
                     let loop_cond = self.fresh_label("forlist.cond");
                     let loop_body = self.fresh_label("forlist.body");
+                    let loop_step = self.fresh_label("forlist.step");
                     let loop_end = self.fresh_label("forlist.end");
+                    self.loop_stack.push((loop_step.clone(), loop_end.clone()));
                     let _ = writeln!(self.body, "  br label %{}", loop_cond);
                     let _ = writeln!(self.body, "{}:", loop_cond);
                     let cur = self.fresh();
@@ -629,6 +640,8 @@ impl Codegen {
 
                     self.emit_block(body);
 
+                    let _ = writeln!(self.body, "  br label %{}", loop_step);
+                    let _ = writeln!(self.body, "{}:", loop_step);
                     let cur2 = self.fresh();
                     let _ = writeln!(self.body, "  {} = load i64, ptr {}, align 8", cur2, idx);
                     let next = self.fresh();
@@ -636,6 +649,48 @@ impl Codegen {
                     let _ = writeln!(self.body, "  store i64 {}, ptr {}, align 8", next, idx);
                     let _ = writeln!(self.body, "  br label %{}", loop_cond);
                     let _ = writeln!(self.body, "{}:", loop_end);
+                    self.loop_stack.pop();
+                }
+            }
+            Stmt::While { condition, body } => {
+                let loop_cond = self.fresh_label("while.cond");
+                let loop_body = self.fresh_label("while.body");
+                let loop_end = self.fresh_label("while.end");
+                // continue jumps to condition re-check
+                self.loop_stack.push((loop_cond.clone(), loop_end.clone()));
+                let _ = writeln!(self.body, "  br label %{}", loop_cond);
+                let _ = writeln!(self.body, "{}:", loop_cond);
+                let (cval, _) = self.emit_expr(condition);
+                // Comparisons yield i1; use same pattern as if
+                let _ = writeln!(
+                    self.body,
+                    "  br i1 {}, label %{}, label %{}",
+                    cval, loop_body, loop_end
+                );
+                let _ = writeln!(self.body, "{}:", loop_body);
+                self.emit_block(body);
+                let _ = writeln!(self.body, "  br label %{}", loop_cond);
+                let _ = writeln!(self.body, "{}:", loop_end);
+                self.loop_stack.pop();
+            }
+            Stmt::Break => {
+                if let Some((_, brk)) = self.loop_stack.last() {
+                    let brk = brk.clone();
+                    let _ = writeln!(self.body, "  br label %{}", brk);
+                    let cont = self.fresh_label("after.break");
+                    let _ = writeln!(self.body, "{}:", cont);
+                } else {
+                    self.errors.push("codegen: break outside loop".into());
+                }
+            }
+            Stmt::Continue => {
+                if let Some((cont_lbl, _)) = self.loop_stack.last() {
+                    let cont_lbl = cont_lbl.clone();
+                    let _ = writeln!(self.body, "  br label %{}", cont_lbl);
+                    let after = self.fresh_label("after.continue");
+                    let _ = writeln!(self.body, "{}:", after);
+                } else {
+                    self.errors.push("codegen: continue outside loop".into());
                 }
             }
             Stmt::Return(None) => {
@@ -979,6 +1034,36 @@ impl Codegen {
                 if let Expr::Ident(name) = callee.as_ref() {
                     // Built-in math (stdlib) — always available
                     let builtin = name.strip_prefix("std_").unwrap_or(name.as_str());
+                    if builtin == "assert" {
+                        let (v, _) = self.emit_expr(&args[0]);
+                        let ok = self.fresh();
+                        let _ = writeln!(self.body, "  {} = icmp ne i64 {}, 0", ok, v);
+                        let pass = self.fresh_label("assert.ok");
+                        let fail = self.fresh_label("assert.fail");
+                        let _ = writeln!(
+                            self.body,
+                            "  br i1 {}, label %{}, label %{}",
+                            ok, pass, fail
+                        );
+                        let _ = writeln!(self.body, "{}:", fail);
+                        // print and exit
+                        let msg = self.intern_string("Assertion failed");
+                        let fmt = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = getelementptr inbounds [4 x i8], ptr @.fmt_str, i64 0, i64 0",
+                            fmt
+                        );
+                        let _ = writeln!(
+                            self.body,
+                            "  call i32 (ptr, ...) @printf(ptr {}, ptr {})",
+                            fmt, msg
+                        );
+                        let _ = writeln!(self.body, "  call void @exit(i32 1)");
+                        let _ = writeln!(self.body, "  unreachable");
+                        let _ = writeln!(self.body, "{}:", pass);
+                        return ("1".into(), VarKind::Number);
+                    }
                     let is_math = matches!(
                         builtin,
                         "abs"

@@ -149,6 +149,9 @@ impl WasmCodegen {
                 }
                 self.body.push("    end".into());
             }
+            Stmt::While { .. } | Stmt::Break | Stmt::Continue => {
+                // while/break/continue: limited WASM support
+            }
             Stmt::For {
                 var,
                 iterable,

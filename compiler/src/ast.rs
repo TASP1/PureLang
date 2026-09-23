@@ -111,6 +111,15 @@ pub enum Stmt {
         iterable: Expr,
         body: Block,
     },
+    /// `while condition { ... }`
+    While {
+        condition: Expr,
+        body: Block,
+    },
+    /// `break`
+    Break,
+    /// `continue`
+    Continue,
     /// `return` or `return expr`
     Return(Option<Expr>),
     /// `match expr { Pattern => block ... }`

@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.18.0**
+**Compiler:** `purec` **v0.19.0**
 
 ## Quick Example
 
@@ -53,13 +53,15 @@ fn main() {
 - [x] **Error handling** (`?`)
 - [x] **Stdlib math** (`abs`, `min`, `max`, `pow`, `sqrt`, … + `std.*`)
 - [x] CI on **public** GitHub Actions (free minutes + Rust cache)
+- [x] **while / break / continue**
+- [x] **assert** builtin
 - [x] **Multi-platform**: Linux, Windows, macOS CI + `--target` / `--opt`
 
 ### Next
-- [ ] File I/O & richer collections
-- [ ] Formatter (`pure fmt`) / LSP
-- [ ] Cross-compilation & optimizations
-- [ ] Package manager foundation
+- [ ] Map / dict collections
+- [ ] Networking & concurrency
+- [ ] Cross-compile sysroots (iOS / Android)
+- [ ] Self-hosting / richer tests
 
 ## Try it
 
@@ -87,7 +89,7 @@ wasmtime hello.wat
 
 ```
 PureLang/
-├── compiler/                 # purec v0.18.0 (Rust)
+├── compiler/                 # purec v0.19.0 (Rust)
 │   └── src/
 │       ├── main.rs           # CLI
 │       ├── lexer.rs / token.rs

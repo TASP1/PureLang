@@ -373,6 +373,15 @@ impl Parser {
             }
             Token::If => self.parse_if(),
             Token::For => self.parse_for(),
+            Token::While => self.parse_while(),
+            Token::Break => {
+                self.advance();
+                Ok(Stmt::Break)
+            }
+            Token::Continue => {
+                self.advance();
+                Ok(Stmt::Continue)
+            }
             Token::Match => self.parse_match(),
             Token::Return => {
                 self.advance();
@@ -456,6 +465,13 @@ impl Parser {
             iterable,
             body,
         })
+    }
+
+    fn parse_while(&mut self) -> Result<Stmt, ParseError> {
+        self.expect(Token::While)?;
+        let condition = self.parse_expr()?;
+        let body = self.parse_block()?;
+        Ok(Stmt::While { condition, body })
     }
 
     fn parse_match(&mut self) -> Result<Stmt, ParseError> {
