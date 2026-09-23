@@ -28,7 +28,7 @@ pub fn run() {
 
         match method.as_str() {
             "initialize" => {
-                let result = r#"{"capabilities":{"textDocumentSync":1,"hoverProvider":true,"diagnosticProvider":{}}}"#;
+                let result = r#"{"capabilities":{"textDocumentSync":1,"hoverProvider":true,"completionProvider":{"triggerCharacters":[".","("]},"definitionProvider":false,"documentSymbolProvider":false}}"#;
                 respond(&mut stdout, id.as_deref(), result);
             }
             "initialized" | "workspace/didChangeConfiguration" => {}
@@ -54,8 +54,20 @@ pub fn run() {
                 }
             }
             "textDocument/hover" => {
-                let result = r#"{"contents":{"kind":"markdown","value":"**PureLang**\n\nType-check with purec. Hover detail expands in future LSP versions."}}"#;
-                respond(&mut stdout, id.as_deref(), result);
+                let uri = json_nested_str(&msg, &["params", "textDocument", "uri"]);
+                let text = uri
+                    .and_then(|u| open_files.get(&u).cloned())
+                    .unwrap_or_default();
+                let hover = hover_info(&text);
+                let result = format!(
+                    r#"{{"contents":{{"kind":"markdown","value":{}}}}}"#,
+                    json_escape(&hover)
+                );
+                respond(&mut stdout, id.as_deref(), &result);
+            }
+            "textDocument/completion" => {
+                let items = completion_items();
+                respond(&mut stdout, id.as_deref(), &items);
             }
             "" if id.is_some() => {
                 // response to our request — ignore
@@ -157,6 +169,66 @@ fn analyze(source: &str) -> Vec<Diag> {
         Ok(()) => Vec::new(),
         Err(errors) => errors.into_iter().map(|e| Diag(0, e.to_string())).collect(),
     }
+}
+
+fn hover_info(source: &str) -> String {
+    let mut lines = Vec::new();
+    lines.push("**PureLang**".into());
+    lines.push(format!("Lines: {}", source.lines().count()));
+    let mut lexer = Lexer::new(source);
+    let tokens = lexer.tokenize();
+    let mut parser = Parser::new(tokens);
+    match parser.parse_program() {
+        Ok(prog) => {
+            lines.push(format!("Items: {}", prog.items.len()));
+            let mut checker = TypeChecker::new();
+            match checker.check_program(&prog) {
+                Ok(()) => lines.push("Type check: ✓".into()),
+                Err(e) => lines.push(format!("Type errors: {}", e.len())),
+            }
+        }
+        Err(e) => lines.push(format!("Parse error: {}", e)),
+    }
+    lines.join("\n\n")
+}
+
+fn completion_items() -> String {
+    let keywords = [
+        "fn", "mut", "if", "else", "for", "in", "return", "print", "struct", "enum", "match",
+        "mod", "pub", "trait", "impl", "true", "false",
+    ];
+    let builtins = [
+        "abs",
+        "min",
+        "max",
+        "pow",
+        "sqrt",
+        "floor",
+        "ceil",
+        "round",
+        "sin",
+        "cos",
+        "read_file",
+        "write_file",
+        "file_exists",
+        "list_len",
+        "list_get",
+        "list_sum",
+    ];
+    let mut parts = Vec::new();
+    for (i, k) in keywords.iter().enumerate() {
+        parts.push(format!(
+            r#"{{"label":"{}","kind":14,"detail":"keyword","sortText":"0{:02}"}}"#,
+            k, i
+        ));
+    }
+    for (i, b) in builtins.iter().enumerate() {
+        parts.push(format!(
+            r#"{{"label":"{}","kind":3,"detail":"builtin","sortText":"1{:02}"}}"#,
+            b, i
+        ));
+    }
+    format!("[{}]", parts.join(","))
 }
 
 fn json_escape(s: &str) -> String {

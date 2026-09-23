@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.15.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.16.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
@@ -352,7 +352,7 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("PureLang Compiler (purec) v0.15.0");
+    eprintln!("PureLang Compiler (purec) v0.16.0");
     eprintln!();
     eprintln!("Usage:");
     eprintln!("  purec <file.pure>                 Type-check");

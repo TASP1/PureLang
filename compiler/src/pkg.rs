@@ -148,10 +148,28 @@ fn cmd_build() {
             }
         }
     }
+    let purec = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("purec"));
     for d in &dep_paths {
         println!("dependency path: {}", d.display());
+        let dep_toml = d.join("Pure.toml");
+        if dep_toml.exists() {
+            if let Ok(txt) = fs::read_to_string(&dep_toml) {
+                let dep_entry = parse_entry(&txt);
+                let dep_file = d.join(&dep_entry);
+                if dep_file.exists() {
+                    println!("  type-check {}", dep_file.display());
+                    let st = Command::new(&purec)
+                        .arg(dep_file.to_string_lossy().as_ref())
+                        .status()
+                        .expect("check dep");
+                    if !st.success() {
+                        eprintln!("Dependency failed: {}", d.display());
+                        process::exit(1);
+                    }
+                }
+            }
+        }
     }
-    let purec = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("purec"));
     let status = Command::new(&purec)
         .args(["--compile", "-o", "app", &entry])
         .status()
