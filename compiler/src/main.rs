@@ -41,24 +41,12 @@ fn main() {
         match args[i].as_str() {
             "--tokens" => {
                 mode = "tokens";
-                i += 1;
-                if i < args.len() {
-                    filename = Some(&args[i]);
-                }
             }
             "--ast" => {
                 mode = "ast";
-                i += 1;
-                if i < args.len() {
-                    filename = Some(&args[i]);
-                }
             }
             "--emit-ir" => {
                 mode = "ir";
-                i += 1;
-                if i < args.len() && !args[i].starts_with('-') {
-                    filename = Some(&args[i]);
-                }
             }
             "-o" | "--output" => {
                 i += 1;
@@ -71,10 +59,8 @@ fn main() {
             }
             "--emit-wasm" => {
                 mode = "wasm";
-                i += 1;
-                if i < args.len() && !args[i].starts_with('-') {
-                    filename = Some(&args[i]);
-                }
+                // Do not advance i here — the loop advances once per arg.
+                // Filename is picked up by the non-option arm.
             }
             s if s.starts_with('-') => {
                 eprintln!("Unknown option: {}", s);
