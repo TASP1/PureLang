@@ -1,11 +1,11 @@
-// Modules: mod name { fn ... } called as name.fn(...)
+// Modules: mod name { pub fn ... } called as name.fn(...)
 
 mod math {
-    fn add(a: Number, b: Number) {
+    pub fn add(a: Number, b: Number) {
         return a + b
     }
 
-    fn double(x: Number) {
+    pub fn double(x: Number) {
         return x * 2
     }
 }
