@@ -396,3 +396,15 @@ fn main() {
     }
 }
 ```
+
+
+### Sleep & HTTP
+
+```pure
+fn main() {
+    sleep_ms(100)
+    // HTTP/1.0 GET — http:// only (no TLS in MVP)
+    body = http_get("http://example.com/")
+    print str_len(body)
+}
+```

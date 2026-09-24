@@ -1,0 +1,12 @@
+// Concurrency + networking foundation: sleep_ms, http_get (http:// only)
+
+fn main() {
+    a = time_ms()
+    sleep_ms(50)
+    b = time_ms()
+    print b - a
+
+    // Offline-safe: https unsupported → empty string
+    r = http_get("https://example.com/")
+    print str_len(r)
+}

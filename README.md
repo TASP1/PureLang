@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.23.0**
+**Compiler:** `purec` **v0.24.0**
 
 ## Quick Example
 
@@ -47,7 +47,7 @@ fn main() {
 - [x] Modules, `pub`, traits, generics, `?`
 - [x] Control flow: `if` / `for` / **`while` / `break` / `continue`**
 - [x] Types: Number, **Float**, String, Bool, List, **Map**, structs, enums
-- [x] **assert**, **exit**, **time_ms**
+- [x] **assert**, **exit**, **time_ms**, **sleep_ms**, **http_get**
 
 ### Standard library
 - [x] Math (`abs`, `min`, `max`, `pow`, `sqrt`, trig, … + `std.*`)
@@ -66,7 +66,8 @@ fn main() {
 - [x] Golden output tests (`tests/run.sh`)
 
 ### Next
-- [ ] Networking & concurrency
+- [x] Networking & concurrency foundation (`sleep_ms`, `http_get`)
+- [ ] Threads / channels
 - [ ] Native UI backends (beyond HTML export)
 - [ ] iOS / Android sysroot automation
 - [ ] Self-hosting compiler
@@ -96,7 +97,7 @@ cargo run --release -- pkg init myapp
 
 ```
 PureLang/
-├── compiler/           # purec v0.23.0 (Rust)
+├── compiler/           # purec v0.24.0 (Rust)
 │   └── src/            # lexer → parser → checker → codegen / wasm / lsp / pkg
 ├── runtime/            # purelang_rt.c (maps, UI, time_ms, strings)
 ├── docs/               # architecture, syntax, platforms, UI, package, …

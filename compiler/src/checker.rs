@@ -129,6 +129,10 @@ impl TypeChecker {
             ("time_ms", vec![], Number),
             ("std_exit", vec![Number], Number),
             ("std_time_ms", vec![], Number),
+            ("sleep_ms", vec![Number], Number),
+            ("http_get", vec![String], String),
+            ("std_sleep_ms", vec![Number], Number),
+            ("std_http_get", vec![String], String),
             // UI (HTML output via runtime)
             ("ui_begin", vec![String, Number, Number], Number),
             ("ui_text", vec![String], Number),

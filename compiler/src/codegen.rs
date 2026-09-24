@@ -304,6 +304,8 @@ impl Codegen {
         self.preamble.push_str("declare void @pl_ui_label(ptr)\n");
         self.preamble.push_str("declare i64 @pl_ui_end()\n");
         self.preamble.push_str("declare i64 @pl_time_ms()\n");
+        self.preamble.push_str("declare void @pl_sleep_ms(i64)\n");
+        self.preamble.push_str("declare ptr @pl_http_get(ptr)\n");
         self.preamble
             .push_str("declare i64 @pl_str_contains(ptr, ptr)\n");
         self.preamble.push_str("declare i64 @pl_str_eq(ptr, ptr)\n");
@@ -1210,6 +1212,23 @@ impl Codegen {
                         let res = self.fresh();
                         let _ = writeln!(self.body, "  {} = call i64 @pl_time_ms()", res);
                         return (res, VarKind::Number);
+                    }
+                    if builtin == "sleep_ms" {
+                        let (ms, _) = self.emit_expr(&args[0]);
+                        let _ = writeln!(self.body, "  call void @pl_sleep_ms(i64 {})", ms);
+                        return ("0".into(), VarKind::Number);
+                    }
+                    if builtin == "http_get" {
+                        if args.len() != 1 {
+                            self.errors.push("codegen: http_get expects 1 arg".into());
+                            return ("0".into(), VarKind::String);
+                        }
+                        let (u, uk) = self.emit_expr(&args[0]);
+                        let us = self.ensure_string(u, uk);
+                        let res = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = call ptr @pl_http_get(ptr {})", res, us);
+                        return (res, VarKind::String);
                     }
                     // Runtime maps
                     if builtin == "map_new" {
