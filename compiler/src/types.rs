@@ -5,6 +5,8 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Number,
+    /// IEEE-754 floating point (codegen: double)
+    Float,
     String,
     Bool,
     /// Inclusive/exclusive range of numbers (from `a..b`)
@@ -36,13 +38,12 @@ impl Type {
         matches!(
             self,
             Type::Number
+                | Type::Float
                 | Type::Bool
                 | Type::Range
                 | Type::Void
                 | Type::Enum(_)
                 | Type::Generic(_)
-                | Type::List(_)
-                | Type::Struct(_)
                 | Type::Unknown
         )
     }
@@ -51,12 +52,12 @@ impl Type {
     pub fn is_move_type(&self) -> bool {
         // Phase 2 MVP: lists/structs copy for field/index/helper use.
         // Strings still move.
-        matches!(self, Type::String | Type::Function { .. })
+        matches!(self, Type::String | Type::Map | Type::Function { .. })
     }
 
     #[allow(dead_code)]
     pub fn is_numeric(&self) -> bool {
-        matches!(self, Type::Number)
+        matches!(self, Type::Number | Type::Float)
     }
 
     #[allow(dead_code)]
@@ -69,6 +70,7 @@ impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Type::Number => write!(f, "Number"),
+            Type::Float => write!(f, "Float"),
             Type::String => write!(f, "String"),
             Type::Bool => write!(f, "Bool"),
             Type::Range => write!(f, "Range"),

@@ -1,0 +1,11 @@
+// Ownership: strings move by default; re-bind after move is OK
+
+fn main() {
+    s = "hello"
+    print s
+    // print borrows — still usable
+    print s
+    t = s
+    // s was moved into t; print t is OK
+    print t
+}

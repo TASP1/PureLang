@@ -517,7 +517,13 @@ impl TypeChecker {
         }
         fn expr_ty_hint(expr: &Expr) -> Type {
             match expr {
-                Expr::Number(_) => Type::Number,
+                Expr::Number(n) => {
+                    if n.fract().abs() > 1e-12 {
+                        Type::Float
+                    } else {
+                        Type::Number
+                    }
+                }
                 Expr::String(_) => Type::String,
                 Expr::Bool(_) => Type::Bool,
                 Expr::Binary { op, .. } => match op {
@@ -805,7 +811,13 @@ impl TypeChecker {
 
     fn check_expr(&mut self, expr: &Expr) -> Type {
         match expr {
-            Expr::Number(_) => Type::Number,
+            Expr::Number(n) => {
+                if n.fract().abs() > 1e-12 {
+                    Type::Float
+                } else {
+                    Type::Number
+                }
+            }
             Expr::String(_) => Type::String,
             Expr::Bool(_) => Type::Bool,
             Expr::Ident(name) => self.check_ident(name),
@@ -950,13 +962,17 @@ impl TypeChecker {
 
         match op {
             BinaryOp::Add => {
-                // Number + Number → Number
-                // Any involvement of String → String (convenience concat)
+                // Numeric + numeric → Number or Float; String involvement → String
                 match (&l, &r) {
                     (Type::Number, Type::Number) => Type::Number,
+                    (Type::Float, Type::Float)
+                    | (Type::Float, Type::Number)
+                    | (Type::Number, Type::Float) => Type::Float,
                     (Type::String, Type::String)
                     | (Type::String, Type::Number)
                     | (Type::Number, Type::String)
+                    | (Type::String, Type::Float)
+                    | (Type::Float, Type::String)
                     | (Type::String, Type::Unknown)
                     | (Type::Unknown, Type::String) => Type::String,
                     (Type::Unknown, _) | (_, Type::Unknown) => Type::Unknown,
@@ -967,25 +983,38 @@ impl TypeChecker {
                 }
             }
             BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
-                if (l == Type::Number || l == Type::Unknown)
-                    && (r == Type::Number || r == Type::Unknown)
-                {
-                    Type::Number
+                let ln = matches!(l, Type::Number | Type::Float | Type::Unknown);
+                let rn = matches!(r, Type::Number | Type::Float | Type::Unknown);
+                if ln && rn {
+                    if matches!(l, Type::Float) || matches!(r, Type::Float) {
+                        Type::Float
+                    } else if matches!(l, Type::Unknown) || matches!(r, Type::Unknown) {
+                        Type::Unknown
+                    } else {
+                        Type::Number
+                    }
                 } else {
                     self.error(format!("Cannot apply '{}' to {} and {}", op, l, r));
                     Type::Unknown
                 }
             }
             BinaryOp::Eq | BinaryOp::NotEq => {
-                // Equality allowed between same types
-                if l != r && l != Type::Unknown && r != Type::Unknown {
+                // Equality: same types, or Number/Float mix
+                let ok = l == r
+                    || l == Type::Unknown
+                    || r == Type::Unknown
+                    || matches!(
+                        (&l, &r),
+                        (Type::Number, Type::Float) | (Type::Float, Type::Number)
+                    );
+                if !ok {
                     self.error(format!("Cannot compare {} and {} for equality", l, r));
                 }
                 Type::Bool
             }
             BinaryOp::Lt | BinaryOp::Gt | BinaryOp::LtEq | BinaryOp::GtEq => {
-                if (l == Type::Number || l == Type::Unknown)
-                    && (r == Type::Number || r == Type::Unknown)
+                if matches!(l, Type::Number | Type::Float | Type::Unknown)
+                    && matches!(r, Type::Number | Type::Float | Type::Unknown)
                 {
                     Type::Bool
                 } else {
@@ -1000,8 +1029,12 @@ impl TypeChecker {
         let t = self.check_expr(expr);
         match op {
             UnaryOp::Neg => {
-                if t == Type::Number || t == Type::Unknown {
-                    Type::Number
+                if matches!(t, Type::Number | Type::Float | Type::Unknown) {
+                    if matches!(t, Type::Float) {
+                        Type::Float
+                    } else {
+                        Type::Number
+                    }
                 } else {
                     self.error(format!("Cannot negate {}", t));
                     Type::Unknown
@@ -1016,6 +1049,35 @@ impl TypeChecker {
                 }
             }
         }
+    }
+
+    /// Builtins that only *read* string/map args — borrow instead of move.
+    fn arg_should_borrow(callee_name: &str, arg_index: usize) -> bool {
+        let name = callee_name.strip_prefix("std_").unwrap_or(callee_name);
+        match name {
+            "str_len" | "str_is_empty" | "str_contains" | "str_eq" | "str_concat" => true,
+            "str_from_num" => false,
+            "map_get" | "map_has" | "map_len" => true,
+            "map_set" => arg_index == 0 || arg_index == 1, // map + key borrowed; value is Number
+            "map_new" => false,
+            "read_file" | "file_exists" | "write_file" => arg_index == 0,
+            "print" => true,
+            _ => false,
+        }
+    }
+
+    fn check_args_for_callee(&mut self, callee_name: Option<&str>, args: &[Expr]) -> Vec<Type> {
+        args.iter()
+            .enumerate()
+            .map(|(i, a)| {
+                if let Some(n) = callee_name {
+                    if Self::arg_should_borrow(n, i) {
+                        return self.check_expr_ref(a);
+                    }
+                }
+                self.check_expr(a)
+            })
+            .collect()
     }
 
     fn check_call(&mut self, callee: &Expr, args: &[Expr]) -> Type {
@@ -1167,8 +1229,12 @@ impl TypeChecker {
             }
         }
 
+        let callee_name = match callee {
+            Expr::Ident(n) => Some(n.as_str()),
+            _ => None,
+        };
         let callee_ty = self.check_expr(callee);
-        let arg_tys: Vec<Type> = args.iter().map(|a| self.check_expr(a)).collect();
+        let arg_tys = self.check_args_for_callee(callee_name, args);
 
         match callee_ty {
             Type::Function { params, ret } => {

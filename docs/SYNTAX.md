@@ -337,3 +337,24 @@ fn main() {
     print str_from_num(42)
 }
 ```
+
+
+### Number vs Float
+
+- Integer-looking literals (`42`) have type **Number** (codegen `i64`).
+- Literals with a decimal point (`1.5`) have type **Float** (codegen `double`).
+- Mixing Number and Float in arithmetic promotes to **Float**.
+
+```pure
+fn main() {
+    print 1.5 + 2.5   // 4
+    print 10.0 / 4.0  // 2.5
+    print 3 + 0.5     // 3.5
+}
+```
+
+### Ownership (moves)
+
+- **String** and **Map** move by default when assigned or passed by value.
+- Field access, indexing, `print`, and reading builtins (`str_len`, `map_get`, …) **borrow**.
+- Use after move is a type error.

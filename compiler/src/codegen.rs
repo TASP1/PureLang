@@ -33,6 +33,7 @@ pub struct Codegen {
 #[derive(Clone, Copy, PartialEq)]
 enum VarKind {
     Number,
+    Float,
     String,
     Map,
     /// Pointer to a struct value on the stack
@@ -343,6 +344,9 @@ impl Codegen {
             "@.fmt_i64 = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\", align 1\n",
         );
         self.preamble.push_str(
+            "@.fmt_f64 = private unnamed_addr constant [4 x i8] c\"%g\\0A\\00\", align 1\n",
+        );
+        self.preamble.push_str(
             "@.fmt_concat_sn = private unnamed_addr constant [7 x i8] c\"%s%lld\\00\", align 1\n",
         );
         self.preamble.push('\n');
@@ -498,6 +502,10 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
+                        VarKind::Float => {
+                            let _ =
+                                writeln!(self.body, "  store double {}, ptr {}, align 8", val, ptr);
+                        }
                         VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
@@ -510,6 +518,11 @@ impl Codegen {
                             let _ = writeln!(self.body, "  {} = alloca i64, align 8", ptr);
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
+                        }
+                        VarKind::Float => {
+                            let _ = writeln!(self.body, "  {} = alloca double, align 8", ptr);
+                            let _ =
+                                writeln!(self.body, "  store double {}, ptr {}, align 8", val, ptr);
                         }
                         VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
                             let _ = writeln!(self.body, "  {} = alloca ptr, align 8", ptr);
@@ -527,6 +540,10 @@ impl Codegen {
                         VarKind::Number | VarKind::Enum => {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
+                        }
+                        VarKind::Float => {
+                            let _ =
+                                writeln!(self.body, "  store double {}, ptr {}, align 8", val, ptr);
                         }
                         VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
                             let _ =
@@ -887,6 +904,19 @@ impl Codegen {
                     fmt, val
                 );
             }
+            VarKind::Float => {
+                let fmt = self.fresh();
+                let _ = writeln!(
+                    self.body,
+                    "  {} = getelementptr inbounds [4 x i8], ptr @.fmt_f64, i64 0, i64 0",
+                    fmt
+                );
+                let _ = writeln!(
+                    self.body,
+                    "  call i32 (ptr, ...) @printf(ptr {}, double {})",
+                    fmt, val
+                );
+            }
             VarKind::Struct | VarKind::List | VarKind::Map => {
                 let fmt = self.fresh();
                 let _ = writeln!(
@@ -905,9 +935,24 @@ impl Codegen {
         }
     }
 
+    fn ensure_double(&mut self, val: String, kind: VarKind) -> String {
+        if kind == VarKind::Float {
+            return val;
+        }
+        let d = self.fresh();
+        let _ = writeln!(self.body, "  {} = sitofp i64 {} to double", d, val);
+        d
+    }
+
     fn emit_expr(&mut self, expr: &Expr) -> (String, VarKind) {
         match expr {
-            Expr::Number(n) => ((n.to_i64_trunc()).to_string(), VarKind::Number),
+            Expr::Number(n) => {
+                if n.fract().abs() > 1e-12 {
+                    (format!("{:.17e}", n), VarKind::Float)
+                } else {
+                    ((n.to_i64_trunc()).to_string(), VarKind::Number)
+                }
+            }
             Expr::String(s) => {
                 let g = self.intern_string(s);
                 let len = s.len() + 1;
@@ -928,6 +973,13 @@ impl Codegen {
                             let _ = writeln!(
                                 self.body,
                                 "  {} = load i64, ptr {}, align 8",
+                                loaded, ptr
+                            );
+                        }
+                        VarKind::Float => {
+                            let _ = writeln!(
+                                self.body,
+                                "  {} = load double, ptr {}, align 8",
                                 loaded, ptr
                             );
                         }
@@ -953,12 +1005,70 @@ impl Codegen {
                         return self.emit_str_concat(lv, lk, rv, rk);
                     }
                     let res = self.fresh();
+                    if lk == VarKind::Float || rk == VarKind::Float {
+                        let lf = self.ensure_double(lv, lk);
+                        let rf = self.ensure_double(rv, rk);
+                        let _ = writeln!(self.body, "  {} = fadd double {}, {}", res, lf, rf);
+                        return (res, VarKind::Float);
+                    }
                     let _ = writeln!(self.body, "  {} = add i64 {}, {}", res, lv, rv);
                     return (res, VarKind::Number);
                 }
-                let (lv, _) = self.emit_expr(left);
-                let (rv, _) = self.emit_expr(right);
+                let (lv, lk) = self.emit_expr(left);
+                let (rv, rk) = self.emit_expr(right);
                 let res = self.fresh();
+                if lk == VarKind::Float || rk == VarKind::Float {
+                    let lf = self.ensure_double(lv, lk);
+                    let rf = self.ensure_double(rv, rk);
+                    match op {
+                        BinaryOp::Add => {
+                            let _ = writeln!(self.body, "  {} = fadd double {}, {}", res, lf, rf);
+                        }
+                        BinaryOp::Sub => {
+                            let _ = writeln!(self.body, "  {} = fsub double {}, {}", res, lf, rf);
+                        }
+                        BinaryOp::Mul => {
+                            let _ = writeln!(self.body, "  {} = fmul double {}, {}", res, lf, rf);
+                        }
+                        BinaryOp::Div => {
+                            let _ = writeln!(self.body, "  {} = fdiv double {}, {}", res, lf, rf);
+                        }
+                        BinaryOp::Eq => {
+                            let _ =
+                                writeln!(self.body, "  {} = fcmp oeq double {}, {}", res, lf, rf);
+                        }
+                        BinaryOp::NotEq => {
+                            let _ =
+                                writeln!(self.body, "  {} = fcmp one double {}, {}", res, lf, rf);
+                        }
+                        BinaryOp::Lt => {
+                            let _ =
+                                writeln!(self.body, "  {} = fcmp olt double {}, {}", res, lf, rf);
+                        }
+                        BinaryOp::Gt => {
+                            let _ =
+                                writeln!(self.body, "  {} = fcmp ogt double {}, {}", res, lf, rf);
+                        }
+                        BinaryOp::LtEq => {
+                            let _ =
+                                writeln!(self.body, "  {} = fcmp ole double {}, {}", res, lf, rf);
+                        }
+                        BinaryOp::GtEq => {
+                            let _ =
+                                writeln!(self.body, "  {} = fcmp oge double {}, {}", res, lf, rf);
+                        }
+                    }
+                    let outk = match op {
+                        BinaryOp::Eq
+                        | BinaryOp::NotEq
+                        | BinaryOp::Lt
+                        | BinaryOp::Gt
+                        | BinaryOp::LtEq
+                        | BinaryOp::GtEq => VarKind::Number,
+                        _ => VarKind::Float,
+                    };
+                    return (res, outk);
+                }
                 match op {
                     BinaryOp::Add => {
                         let _ = writeln!(self.body, "  {} = add i64 {}, {}", res, lv, rv);
@@ -2066,6 +2176,23 @@ impl Codegen {
                 let _ = writeln!(
                     self.body,
                     "  call i32 (ptr, i64, ptr, ...) @snprintf(ptr {}, i64 32, ptr {}, i64 {})",
+                    buf, fmt, val
+                );
+                buf
+            }
+            VarKind::Float => {
+                let buf = self.fresh();
+                let _ = writeln!(self.body, "  {} = call ptr @malloc(i64 32)", buf);
+                let g = self.intern_string("%g");
+                let fmt = self.fresh();
+                let _ = writeln!(
+                    self.body,
+                    "  {} = getelementptr inbounds [3 x i8], ptr {}, i64 0, i64 0",
+                    fmt, g
+                );
+                let _ = writeln!(
+                    self.body,
+                    "  call i32 (ptr, i64, ptr, ...) @snprintf(ptr {}, i64 32, ptr {}, double {})",
                     buf, fmt, val
                 );
                 buf
