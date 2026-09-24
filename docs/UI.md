@@ -27,3 +27,10 @@ purec --compile -o ui_demo examples/ui_demo.pure
 - Native window backends (raylib / OS toolkits)
 - Event callbacks into PureLang
 - Layout widgets (rows, columns, inputs)
+
+
+## Native UI backends
+
+`ui_native_available()` returns `0` until OS toolkits (Win32 / Cocoa / Android View) are wired.
+
+Today the default backend remains **HTML export** (`ui_begin` … `ui_end` → `purelang_ui.html`).

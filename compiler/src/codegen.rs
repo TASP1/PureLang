@@ -36,6 +36,7 @@ enum VarKind {
     Float,
     String,
     Map,
+    Channel,
     /// Pointer to a struct value on the stack
     Struct,
     /// Pointer to heap list: [i64 len][i64 elems...]
@@ -306,6 +307,14 @@ impl Codegen {
         self.preamble.push_str("declare i64 @pl_time_ms()\n");
         self.preamble.push_str("declare void @pl_sleep_ms(i64)\n");
         self.preamble.push_str("declare ptr @pl_http_get(ptr)\n");
+        self.preamble.push_str("declare ptr @pl_chan_new()\n");
+        self.preamble
+            .push_str("declare void @pl_chan_send(ptr, i64)\n");
+        self.preamble.push_str("declare i64 @pl_chan_recv(ptr)\n");
+        self.preamble
+            .push_str("declare void @pl_thread_spawn_send(ptr, i64, i64)\n");
+        self.preamble
+            .push_str("declare i64 @pl_ui_native_available()\n");
         self.preamble
             .push_str("declare i64 @pl_str_contains(ptr, ptr)\n");
         self.preamble.push_str("declare i64 @pl_str_eq(ptr, ptr)\n");
@@ -509,7 +518,11 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store double {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
+                        VarKind::String
+                        | VarKind::Struct
+                        | VarKind::List
+                        | VarKind::Map
+                        | VarKind::Channel => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -527,7 +540,11 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store double {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
+                        VarKind::String
+                        | VarKind::Struct
+                        | VarKind::List
+                        | VarKind::Map
+                        | VarKind::Channel => {
                             let _ = writeln!(self.body, "  {} = alloca ptr, align 8", ptr);
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
@@ -548,7 +565,11 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store double {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
+                        VarKind::String
+                        | VarKind::Struct
+                        | VarKind::List
+                        | VarKind::Map
+                        | VarKind::Channel => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -920,7 +941,7 @@ impl Codegen {
                     fmt, val
                 );
             }
-            VarKind::Struct | VarKind::List | VarKind::Map => {
+            VarKind::Struct | VarKind::List | VarKind::Map | VarKind::Channel => {
                 let fmt = self.fresh();
                 let _ = writeln!(
                     self.body,
@@ -986,7 +1007,11 @@ impl Codegen {
                                 loaded, ptr
                             );
                         }
-                        VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
+                        VarKind::String
+                        | VarKind::Struct
+                        | VarKind::List
+                        | VarKind::Map
+                        | VarKind::Channel => {
                             let _ = writeln!(
                                 self.body,
                                 "  {} = load ptr, ptr {}, align 8",
@@ -1229,6 +1254,46 @@ impl Codegen {
                         let _ =
                             writeln!(self.body, "  {} = call ptr @pl_http_get(ptr {})", res, us);
                         return (res, VarKind::String);
+                    }
+
+                    if builtin == "channel_new" {
+                        let res = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call ptr @pl_chan_new()", res);
+                        return (res, VarKind::Channel);
+                    }
+                    if builtin == "channel_send" {
+                        let (ch, _) = self.emit_expr(&args[0]);
+                        let (v, _) = self.emit_expr(&args[1]);
+                        let _ = writeln!(
+                            self.body,
+                            "  call void @pl_chan_send(ptr {}, i64 {})",
+                            ch, v
+                        );
+                        return ("0".into(), VarKind::Number);
+                    }
+                    if builtin == "channel_recv" {
+                        let (ch, _) = self.emit_expr(&args[0]);
+                        let res = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = call i64 @pl_chan_recv(ptr {})", res, ch);
+                        return (res, VarKind::Number);
+                    }
+                    if builtin == "thread_spawn_send" {
+                        let (ch, _) = self.emit_expr(&args[0]);
+                        let (ms, _) = self.emit_expr(&args[1]);
+                        let (v, _) = self.emit_expr(&args[2]);
+                        let _ = writeln!(
+                            self.body,
+                            "  call void @pl_thread_spawn_send(ptr {}, i64 {}, i64 {})",
+                            ch, ms, v
+                        );
+                        return ("0".into(), VarKind::Number);
+                    }
+                    if builtin == "ui_native_available" {
+                        let res = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = call i64 @pl_ui_native_available()", res);
+                        return (res, VarKind::Number);
                     }
                     // Runtime maps
                     if builtin == "map_new" {
@@ -2195,7 +2260,7 @@ impl Codegen {
     fn ensure_string(&mut self, val: String, kind: VarKind) -> String {
         match kind {
             VarKind::String => val,
-            VarKind::Struct | VarKind::List | VarKind::Map => val,
+            VarKind::Struct | VarKind::List | VarKind::Map | VarKind::Channel => val,
             VarKind::Number | VarKind::Enum => {
                 let buf = self.fresh();
                 let _ = writeln!(self.body, "  {} = call ptr @malloc(i64 32)", buf);

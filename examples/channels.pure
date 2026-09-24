@@ -1,0 +1,9 @@
+// Channels + background thread (thread_spawn_send)
+
+fn main() {
+    ch = channel_new()
+    thread_spawn_send(ch, 30, 42)
+    v = channel_recv(ch)
+    print v
+    print ui_native_available()
+}

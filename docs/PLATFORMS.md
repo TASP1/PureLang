@@ -115,3 +115,15 @@ entry = "src/main.pure"
 [dependencies]
 utils = { path = "../utils" }
 ```
+
+
+## Sysroot helper scripts
+
+```bash
+# Android NDK → .so
+export ANDROID_NDK=/path/to/ndk
+./scripts/android_build.sh examples/hello.pure libhello.so
+
+# iOS (macOS + Xcode) → .o
+./scripts/ios_build.sh examples/hello.pure hello.o
+```

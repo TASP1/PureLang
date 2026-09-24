@@ -272,3 +272,104 @@ char *pl_http_get(char *url) {
     return buf;
 }
 #endif
+
+
+/* ========== Channels + threads (POSIX) ========== */
+#if defined(_WIN32)
+void *pl_chan_new(void) { return calloc(1, 1); }
+void pl_chan_send(void *ch, int64_t v) { (void)ch; (void)v; }
+int64_t pl_chan_recv(void *ch) { (void)ch; return 0; }
+void pl_thread_spawn_send(void *ch, int64_t delay_ms, int64_t value) {
+    (void)ch; (void)delay_ms; (void)value;
+}
+int64_t pl_ui_native_available(void) { return 0; }
+#else
+#include <pthread.h>
+
+#define PL_CHAN_CAP 64
+typedef struct {
+    pthread_mutex_t mu;
+    pthread_cond_t cv;
+    int64_t q[PL_CHAN_CAP];
+    int head, tail, count;
+    int closed;
+} PLChan;
+
+typedef struct {
+    PLChan *ch;
+    int64_t delay_ms;
+    int64_t value;
+} PLThreadSendArgs;
+
+void *pl_chan_new(void) {
+    PLChan *c = (PLChan *)calloc(1, sizeof(PLChan));
+    if (!c) return NULL;
+    pthread_mutex_init(&c->mu, NULL);
+    pthread_cond_init(&c->cv, NULL);
+    return c;
+}
+
+void pl_chan_send(void *ch, int64_t v) {
+    PLChan *c = (PLChan *)ch;
+    if (!c) return;
+    pthread_mutex_lock(&c->mu);
+    while (c->count == PL_CHAN_CAP && !c->closed) {
+        pthread_cond_wait(&c->cv, &c->mu);
+    }
+    if (!c->closed) {
+        c->q[c->tail] = v;
+        c->tail = (c->tail + 1) % PL_CHAN_CAP;
+        c->count++;
+        pthread_cond_signal(&c->cv);
+    }
+    pthread_mutex_unlock(&c->mu);
+}
+
+int64_t pl_chan_recv(void *ch) {
+    PLChan *c = (PLChan *)ch;
+    if (!c) return 0;
+    pthread_mutex_lock(&c->mu);
+    while (c->count == 0 && !c->closed) {
+        pthread_cond_wait(&c->cv, &c->mu);
+    }
+    int64_t v = 0;
+    if (c->count > 0) {
+        v = c->q[c->head];
+        c->head = (c->head + 1) % PL_CHAN_CAP;
+        c->count--;
+        pthread_cond_signal(&c->cv);
+    }
+    pthread_mutex_unlock(&c->mu);
+    return v;
+}
+
+static void *pl_thread_send_main(void *arg) {
+    PLThreadSendArgs *a = (PLThreadSendArgs *)arg;
+    if (a->delay_ms > 0) {
+        struct timespec ts;
+        ts.tv_sec = (time_t)(a->delay_ms / 1000);
+        ts.tv_nsec = (long)((a->delay_ms % 1000) * 1000000L);
+        nanosleep(&ts, NULL);
+    }
+    pl_chan_send(a->ch, a->value);
+    free(a);
+    return NULL;
+}
+
+void pl_thread_spawn_send(void *ch, int64_t delay_ms, int64_t value) {
+    PLThreadSendArgs *a = (PLThreadSendArgs *)malloc(sizeof(PLThreadSendArgs));
+    if (!a) return;
+    a->ch = (PLChan *)ch;
+    a->delay_ms = delay_ms;
+    a->value = value;
+    pthread_t t;
+    if (pthread_create(&t, NULL, pl_thread_send_main, a) == 0) {
+        pthread_detach(t);
+    } else {
+        free(a);
+    }
+}
+
+/* Native UI: not yet wired to OS toolkits — returns 0; HTML backend remains default */
+int64_t pl_ui_native_available(void) { return 0; }
+#endif

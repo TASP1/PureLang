@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.24.0**
+**Compiler:** `purec` **v0.25.0**
 
 ## Quick Example
 
@@ -48,6 +48,9 @@ fn main() {
 - [x] Control flow: `if` / `for` / **`while` / `break` / `continue`**
 - [x] Types: Number, **Float**, String, Bool, List, **Map**, structs, enums
 - [x] **assert**, **exit**, **time_ms**, **sleep_ms**, **http_get**
+- [x] **Channels / threads** (`channel_new/send/recv`, `thread_spawn_send`)
+- [x] **Mobile sysroot scripts** (`scripts/android_build.sh`, `ios_build.sh`)
+- [x] **Self-host bootstrap** (`bootstrap/`)
 
 ### Standard library
 - [x] Math (`abs`, `min`, `max`, `pow`, `sqrt`, trig, … + `std.*`)
@@ -66,8 +69,8 @@ fn main() {
 - [x] Golden output tests (`tests/run.sh`)
 
 ### Next
-- [x] Networking & concurrency foundation (`sleep_ms`, `http_get`)
-- [ ] Threads / channels
+- [x] Networking (`sleep_ms`, `http_get` + HTTPS via curl)
+- [x] Threads / channels (`channel_*`, `thread_spawn_send`)
 - [ ] Native UI backends (beyond HTML export)
 - [ ] iOS / Android sysroot automation
 - [ ] Self-hosting compiler
@@ -97,7 +100,7 @@ cargo run --release -- pkg init myapp
 
 ```
 PureLang/
-├── compiler/           # purec v0.24.0 (Rust)
+├── compiler/           # purec v0.25.0 (Rust)
 │   └── src/            # lexer → parser → checker → codegen / wasm / lsp / pkg
 ├── runtime/            # purelang_rt.c (maps, UI, time_ms, strings)
 ├── docs/               # architecture, syntax, platforms, UI, package, …

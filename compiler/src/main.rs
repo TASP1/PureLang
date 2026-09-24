@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.24.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.25.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
@@ -290,6 +290,7 @@ fn main() {
     // Math library: libm on Unix; on Windows MSVC math is in the CRT
     if !triple.contains("windows") {
         cmd.arg("-lm");
+        cmd.arg("-lpthread");
     }
     // Explicit target when cross-compiling or for consistency
     cmd.arg(format!("--target={}", triple));

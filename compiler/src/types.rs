@@ -21,6 +21,8 @@ pub enum Type {
     Generic(String),
     /// Map (string keys → number values) — runtime PLMap*
     Map,
+    /// Channel handle (runtime PLChan*)
+    Channel,
     /// Function type (params -> return)
     Function {
         params: Vec<Type>,
@@ -52,7 +54,10 @@ impl Type {
     pub fn is_move_type(&self) -> bool {
         // Phase 2 MVP: lists/structs copy for field/index/helper use.
         // Strings still move.
-        matches!(self, Type::String | Type::Map | Type::Function { .. })
+        matches!(
+            self,
+            Type::String | Type::Map | Type::Function { .. }
+        )
     }
 
     #[allow(dead_code)]
@@ -79,6 +84,7 @@ impl fmt::Display for Type {
             Type::Enum(name) => write!(f, "{name}"),
             Type::Generic(name) => write!(f, "{name}"),
             Type::Map => write!(f, "Map"),
+            Type::Channel => write!(f, "Channel"),
             Type::Function { params, ret } => {
                 let ps: Vec<String> = params.iter().map(|p| p.to_string()).collect();
                 write!(f, "fn({}) -> {}", ps.join(", "), ret)
