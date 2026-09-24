@@ -311,6 +311,7 @@ impl Codegen {
         self.preamble
             .push_str("declare void @pl_chan_send(ptr, i64)\n");
         self.preamble.push_str("declare i64 @pl_chan_recv(ptr)\n");
+        self.preamble.push_str("declare i64 @pl_chan_len(ptr)\n");
         self.preamble
             .push_str("declare void @pl_thread_spawn_send(ptr, i64, i64)\n");
         self.preamble
@@ -1276,6 +1277,13 @@ impl Codegen {
                         let res = self.fresh();
                         let _ =
                             writeln!(self.body, "  {} = call i64 @pl_chan_recv(ptr {})", res, ch);
+                        return (res, VarKind::Number);
+                    }
+                    if builtin == "channel_len" {
+                        let (ch, _) = self.emit_expr(&args[0]);
+                        let res = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = call i64 @pl_chan_len(ptr {})", res, ch);
                         return (res, VarKind::Number);
                     }
                     if builtin == "thread_spawn_send" {

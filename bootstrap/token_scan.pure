@@ -1,18 +1,23 @@
-// Bootstrap: minimal character classifier over a source string
-// (seed for a future PureLang-written lexer)
+// Bootstrap seed for a PureLang-written lexer (self-hosting path)
+
+fn is_alpha_len(n) {
+    // placeholder classifier using length heuristics only
+    return n
+}
 
 fn main() {
     src = "fn add(a, b) { return a + b }"
     n = str_len(src)
     print n
-    // Count letters vs symbols (manual index loop)
     mut i = 0
-    mut letters = 0
-    mut others = 0
     while i < n {
-        // str_get not available — approximate via length only in MVP bootstrap
         i = i + 1
     }
     print i
-    print ui_native_available()
+    // Map as simple symbol table seed
+    m = map_new()
+    map_set(m, "fn", 1)
+    map_set(m, "return", 1)
+    print map_len(m)
+    print map_has(m, "fn")
 }

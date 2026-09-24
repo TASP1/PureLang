@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.25.0**
+**Compiler:** `purec` **v0.26.0**
 
 ## Quick Example
 
@@ -70,7 +70,7 @@ fn main() {
 
 ### Next
 - [x] Networking (`sleep_ms`, `http_get` + HTTPS via curl)
-- [x] Threads / channels (`channel_*`, `thread_spawn_send`)
+- [x] Threads / channels (`channel_new/send/recv/len`, `thread_spawn_send`)
 - [ ] Native UI backends (beyond HTML export)
 - [ ] iOS / Android sysroot automation
 - [ ] Self-hosting compiler
@@ -100,7 +100,7 @@ cargo run --release -- pkg init myapp
 
 ```
 PureLang/
-├── compiler/           # purec v0.25.0 (Rust)
+├── compiler/           # purec v0.26.0 (Rust)
 │   └── src/            # lexer → parser → checker → codegen / wasm / lsp / pkg
 ├── runtime/            # purelang_rt.c (maps, UI, time_ms, strings)
 ├── docs/               # architecture, syntax, platforms, UI, package, …
@@ -122,6 +122,7 @@ PureLang/
 | [Package manager](docs/PACKAGE.md) | `purec pkg` |
 | [UI](docs/UI.md) | HTML UI export |
 | [Roadmap](docs/ROADMAP.md) | Phases |
+| [Status](docs/STATUS.md) | Honest completion matrix |
 
 ## License
 

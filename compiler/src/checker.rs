@@ -136,11 +136,13 @@ impl TypeChecker {
             ("channel_new", vec![], Channel),
             ("channel_send", vec![Channel, Number], Number),
             ("channel_recv", vec![Channel], Number),
+            ("channel_len", vec![Channel], Number),
             ("thread_spawn_send", vec![Channel, Number, Number], Number),
             ("ui_native_available", vec![], Number),
             ("std_channel_new", vec![], Channel),
             ("std_channel_send", vec![Channel, Number], Number),
             ("std_channel_recv", vec![Channel], Number),
+            ("std_channel_len", vec![Channel], Number),
             (
                 "std_thread_spawn_send",
                 vec![Channel, Number, Number],

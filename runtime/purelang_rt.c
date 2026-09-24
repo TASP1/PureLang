@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <pthread.h>
 #endif
 
 #define PL_MAP_CAP 128
@@ -155,23 +156,24 @@ char *pl_str_from_num(int64_t n) {
 
 int64_t pl_time_ms(void) {
     struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
-        return 0;
-    }
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
     return (int64_t)ts.tv_sec * 1000 + (int64_t)ts.tv_nsec / 1000000;
 }
 
-
 #if defined(_WIN32)
 #include <windows.h>
-void pl_sleep_ms(int64_t ms) {
-    if (ms > 0) Sleep((DWORD)ms);
+void pl_sleep_ms(int64_t ms) { if (ms > 0) Sleep((DWORD)ms); }
+char *pl_http_get(char *url) { (void)url; return (char *)calloc(1, 1); }
+void *pl_chan_new(void) { return calloc(1, 8); }
+void pl_chan_send(void *ch, int64_t v) { (void)ch; (void)v; }
+int64_t pl_chan_recv(void *ch) { (void)ch; return 0; }
+int64_t pl_chan_len(void *ch) { (void)ch; return 0; }
+void pl_thread_spawn_send(void *ch, int64_t delay_ms, int64_t value) {
+    (void)ch; (void)delay_ms; (void)value;
 }
-char *pl_http_get(char *url) {
-    (void)url;
-    return (char *)calloc(1, 1);
-}
+int64_t pl_ui_native_available(void) { return 0; }
 #else
+
 void pl_sleep_ms(int64_t ms) {
     if (ms <= 0) return;
     struct timespec ts;
@@ -180,10 +182,37 @@ void pl_sleep_ms(int64_t ms) {
     while (nanosleep(&ts, &ts) != 0 && errno == EINTR) {}
 }
 
-/* HTTP/1.0 GET — http:// only (no TLS) */
+static char *pl_http_get_curl(const char *url) {
+    char cmd[2048];
+    snprintf(cmd, sizeof(cmd), "curl -fsSL --max-time 30 '%s' 2>/dev/null", url);
+    FILE *fp = popen(cmd, "r");
+    if (!fp) return (char *)calloc(1, 1);
+    size_t cap = 8192, len = 0;
+    char *buf = (char *)malloc(cap);
+    if (!buf) { pclose(fp); return (char *)calloc(1, 1); }
+    for (;;) {
+        if (len + 2048 > cap) {
+            cap *= 2;
+            char *nbuf = (char *)realloc(buf, cap);
+            if (!nbuf) break;
+            buf = nbuf;
+        }
+        size_t n = fread(buf + len, 1, 2047, fp);
+        if (n == 0) break;
+        len += n;
+    }
+    pclose(fp);
+    buf[len] = '\0';
+    return buf;
+}
+
 char *pl_http_get(char *url) {
     char *empty = (char *)calloc(1, 1);
-    if (!url || !empty) return empty;
+    if (!url) return empty;
+    if (strncmp(url, "https://", 8) == 0) {
+        free(empty);
+        return pl_http_get_curl(url);
+    }
     if (strncmp(url, "http://", 7) != 0) return empty;
 
     char host[256], path[1024];
@@ -192,27 +221,20 @@ char *pl_http_get(char *url) {
     const char *slash = strchr(p, '/');
     const char *colon = strchr(p, ':');
     size_t host_len;
-
     if (colon && (!slash || colon < slash)) {
         host_len = (size_t)(colon - p);
         if (host_len >= sizeof(host)) host_len = sizeof(host) - 1;
-        memcpy(host, p, host_len);
-        host[host_len] = '\0';
+        memcpy(host, p, host_len); host[host_len] = '\0';
         port = atoi(colon + 1);
-        if (slash) {
-            strncpy(path, slash, sizeof(path) - 1);
-            path[sizeof(path) - 1] = '\0';
-        } else strcpy(path, "/");
+        if (slash) { strncpy(path, slash, sizeof(path)-1); path[sizeof(path)-1]='\0'; }
+        else strcpy(path, "/");
     } else if (slash) {
         host_len = (size_t)(slash - p);
         if (host_len >= sizeof(host)) host_len = sizeof(host) - 1;
-        memcpy(host, p, host_len);
-        host[host_len] = '\0';
-        strncpy(path, slash, sizeof(path) - 1);
-        path[sizeof(path) - 1] = '\0';
+        memcpy(host, p, host_len); host[host_len] = '\0';
+        strncpy(path, slash, sizeof(path)-1); path[sizeof(path)-1]='\0';
     } else {
-        strncpy(host, p, sizeof(host) - 1);
-        host[sizeof(host) - 1] = '\0';
+        strncpy(host, p, sizeof(host)-1); host[sizeof(host)-1]='\0';
         strcpy(path, "/");
     }
 
@@ -229,8 +251,7 @@ char *pl_http_get(char *url) {
         fd = (int)socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (fd < 0) continue;
         if (connect(fd, ai->ai_addr, ai->ai_addrlen) == 0) break;
-        close(fd);
-        fd = -1;
+        close(fd); fd = -1;
     }
     freeaddrinfo(res);
     if (fd < 0) return empty;
@@ -256,7 +277,6 @@ char *pl_http_get(char *url) {
     }
     close(fd);
     buf[len] = '\0';
-
     char *body = strstr(buf, "\r\n\r\n");
     if (body) {
         body += 4;
@@ -264,27 +284,12 @@ char *pl_http_get(char *url) {
         char *out = (char *)malloc(blen + 1);
         if (!out) { free(buf); return empty; }
         memcpy(out, body, blen + 1);
-        free(buf);
-        free(empty);
+        free(buf); free(empty);
         return out;
     }
     free(empty);
     return buf;
 }
-#endif
-
-
-/* ========== Channels + threads (POSIX) ========== */
-#if defined(_WIN32)
-void *pl_chan_new(void) { return calloc(1, 1); }
-void pl_chan_send(void *ch, int64_t v) { (void)ch; (void)v; }
-int64_t pl_chan_recv(void *ch) { (void)ch; return 0; }
-void pl_thread_spawn_send(void *ch, int64_t delay_ms, int64_t value) {
-    (void)ch; (void)delay_ms; (void)value;
-}
-int64_t pl_ui_native_available(void) { return 0; }
-#else
-#include <pthread.h>
 
 #define PL_CHAN_CAP 64
 typedef struct {
@@ -292,7 +297,6 @@ typedef struct {
     pthread_cond_t cv;
     int64_t q[PL_CHAN_CAP];
     int head, tail, count;
-    int closed;
 } PLChan;
 
 typedef struct {
@@ -313,15 +317,12 @@ void pl_chan_send(void *ch, int64_t v) {
     PLChan *c = (PLChan *)ch;
     if (!c) return;
     pthread_mutex_lock(&c->mu);
-    while (c->count == PL_CHAN_CAP && !c->closed) {
+    while (c->count == PL_CHAN_CAP)
         pthread_cond_wait(&c->cv, &c->mu);
-    }
-    if (!c->closed) {
-        c->q[c->tail] = v;
-        c->tail = (c->tail + 1) % PL_CHAN_CAP;
-        c->count++;
-        pthread_cond_signal(&c->cv);
-    }
+    c->q[c->tail] = v;
+    c->tail = (c->tail + 1) % PL_CHAN_CAP;
+    c->count++;
+    pthread_cond_signal(&c->cv);
     pthread_mutex_unlock(&c->mu);
 }
 
@@ -329,28 +330,28 @@ int64_t pl_chan_recv(void *ch) {
     PLChan *c = (PLChan *)ch;
     if (!c) return 0;
     pthread_mutex_lock(&c->mu);
-    while (c->count == 0 && !c->closed) {
+    while (c->count == 0)
         pthread_cond_wait(&c->cv, &c->mu);
-    }
-    int64_t v = 0;
-    if (c->count > 0) {
-        v = c->q[c->head];
-        c->head = (c->head + 1) % PL_CHAN_CAP;
-        c->count--;
-        pthread_cond_signal(&c->cv);
-    }
+    int64_t v = c->q[c->head];
+    c->head = (c->head + 1) % PL_CHAN_CAP;
+    c->count--;
+    pthread_cond_signal(&c->cv);
     pthread_mutex_unlock(&c->mu);
     return v;
 }
 
+int64_t pl_chan_len(void *ch) {
+    PLChan *c = (PLChan *)ch;
+    if (!c) return 0;
+    pthread_mutex_lock(&c->mu);
+    int64_t n = c->count;
+    pthread_mutex_unlock(&c->mu);
+    return n;
+}
+
 static void *pl_thread_send_main(void *arg) {
     PLThreadSendArgs *a = (PLThreadSendArgs *)arg;
-    if (a->delay_ms > 0) {
-        struct timespec ts;
-        ts.tv_sec = (time_t)(a->delay_ms / 1000);
-        ts.tv_nsec = (long)((a->delay_ms % 1000) * 1000000L);
-        nanosleep(&ts, NULL);
-    }
+    if (a->delay_ms > 0) pl_sleep_ms(a->delay_ms);
     pl_chan_send(a->ch, a->value);
     free(a);
     return NULL;
@@ -363,13 +364,11 @@ void pl_thread_spawn_send(void *ch, int64_t delay_ms, int64_t value) {
     a->delay_ms = delay_ms;
     a->value = value;
     pthread_t t;
-    if (pthread_create(&t, NULL, pl_thread_send_main, a) == 0) {
+    if (pthread_create(&t, NULL, pl_thread_send_main, a) == 0)
         pthread_detach(t);
-    } else {
+    else
         free(a);
-    }
 }
 
-/* Native UI: not yet wired to OS toolkits — returns 0; HTML backend remains default */
 int64_t pl_ui_native_available(void) { return 0; }
 #endif
