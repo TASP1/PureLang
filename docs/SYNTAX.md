@@ -408,3 +408,19 @@ fn main() {
     print str_len(body)
 }
 ```
+
+
+### Function values
+
+```pure
+fn double(x) {
+    return x * 2
+}
+
+fn main() {
+    f = double
+    print f(21)  // 42
+}
+```
+
+MVP: Number parameters and return only for indirect calls.

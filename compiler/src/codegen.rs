@@ -37,6 +37,8 @@ enum VarKind {
     String,
     Map,
     Channel,
+    /// Function pointer (address of purec fn)
+    Fn,
     /// Pointer to a struct value on the stack
     Struct,
     /// Pointer to heap list: [i64 len][i64 elems...]
@@ -323,8 +325,10 @@ impl Codegen {
             .push_str("declare ptr @pl_str_concat(ptr, ptr)\n");
         self.preamble
             .push_str("declare ptr @pl_str_from_num(i64)\n");
-        self.preamble.push_str("declare i64 @pl_str_char_at(ptr, i64)\n");
-        self.preamble.push_str("declare ptr @pl_str_slice(ptr, i64, i64)\n");
+        self.preamble
+            .push_str("declare i64 @pl_str_char_at(ptr, i64)\n");
+        self.preamble
+            .push_str("declare ptr @pl_str_slice(ptr, i64, i64)\n");
         self.preamble.push_str("declare ptr @fopen(ptr, ptr)\n");
         self.preamble
             .push_str("declare i64 @fread(ptr, i64, i64, ptr)\n");
@@ -525,7 +529,8 @@ impl Codegen {
                         | VarKind::Struct
                         | VarKind::List
                         | VarKind::Map
-                        | VarKind::Channel => {
+                        | VarKind::Channel
+                        | VarKind::Fn => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -547,7 +552,8 @@ impl Codegen {
                         | VarKind::Struct
                         | VarKind::List
                         | VarKind::Map
-                        | VarKind::Channel => {
+                        | VarKind::Channel
+                        | VarKind::Fn => {
                             let _ = writeln!(self.body, "  {} = alloca ptr, align 8", ptr);
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
@@ -572,7 +578,8 @@ impl Codegen {
                         | VarKind::Struct
                         | VarKind::List
                         | VarKind::Map
-                        | VarKind::Channel => {
+                        | VarKind::Channel
+                        | VarKind::Fn => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -944,7 +951,7 @@ impl Codegen {
                     fmt, val
                 );
             }
-            VarKind::Struct | VarKind::List | VarKind::Map | VarKind::Channel => {
+            VarKind::Struct | VarKind::List | VarKind::Map | VarKind::Channel | VarKind::Fn => {
                 let fmt = self.fresh();
                 let _ = writeln!(
                     self.body,
@@ -1014,7 +1021,8 @@ impl Codegen {
                         | VarKind::Struct
                         | VarKind::List
                         | VarKind::Map
-                        | VarKind::Channel => {
+                        | VarKind::Channel
+                        | VarKind::Fn => {
                             let _ = writeln!(
                                 self.body,
                                 "  {} = load ptr, ptr {}, align 8",
@@ -1023,6 +1031,9 @@ impl Codegen {
                         }
                     }
                     (loaded, kind)
+                } else if self.functions.contains_key(name) {
+                    // Function value = address of @name
+                    (format!("@{}", name), VarKind::Fn)
                 } else {
                     self.errors.push(format!("codegen: undefined '{}'", name));
                     ("0".into(), VarKind::Number)
@@ -1982,6 +1993,30 @@ impl Codegen {
                         let _ = writeln!(self.body, "  {} = call i64 @{}({})", res, name, args_ir);
                         return (res, VarKind::Number);
                     }
+                    // Indirect call through function value variable
+                    if let Some((_, VarKind::Fn)) = self.vars.get(name).cloned() {
+                        let (fp, _) = self.emit_expr(&Expr::Ident(name.clone()));
+                        let mut arg_irs = Vec::new();
+                        for a in args {
+                            let (v, k) = self.emit_expr(a);
+                            match k {
+                                VarKind::Number | VarKind::Enum => {
+                                    arg_irs.push(format!("i64 {}", v));
+                                }
+                                VarKind::Float => {
+                                    let i = self.fresh();
+                                    let _ =
+                                        writeln!(self.body, "  {} = fptosi double {} to i64", i, v);
+                                    arg_irs.push(format!("i64 {}", i));
+                                }
+                                _ => arg_irs.push("i64 0".into()),
+                            }
+                        }
+                        let res = self.fresh();
+                        let args_s = arg_irs.join(", ");
+                        let _ = writeln!(self.body, "  {} = call i64 {}({})", res, fp, args_s);
+                        return (res, VarKind::Number);
+                    }
                 }
                 // Module path: math.add(...) → @math_add(...)  OR std.sqrt → libm
                 if let Expr::Field { object, field } = callee.as_ref() {
@@ -2305,7 +2340,7 @@ impl Codegen {
     fn ensure_string(&mut self, val: String, kind: VarKind) -> String {
         match kind {
             VarKind::String => val,
-            VarKind::Struct | VarKind::List | VarKind::Map | VarKind::Channel => val,
+            VarKind::Struct | VarKind::List | VarKind::Map | VarKind::Channel | VarKind::Fn => val,
             VarKind::Number | VarKind::Enum => {
                 let buf = self.fresh();
                 let _ = writeln!(self.body, "  {} = call ptr @malloc(i64 32)", buf);

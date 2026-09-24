@@ -54,7 +54,7 @@ impl Type {
     pub fn is_move_type(&self) -> bool {
         // Phase 2 MVP: lists/structs copy for field/index/helper use.
         // Strings still move.
-        matches!(self, Type::String | Type::Map | Type::Function { .. })
+        matches!(self, Type::String | Type::Map)
     }
 
     #[allow(dead_code)]

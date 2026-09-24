@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.27.0**
+**Compiler:** `purec` **v0.28.0**
 
 ## Quick Example
 
@@ -43,7 +43,7 @@ fn main() {
 - [x] Lexer / parser / AST (line-accurate tokens & parse errors)
 - [x] Type checker + ownership / borrows (errors with line numbers)
 - [x] LLVM native codegen (`clang`) + WebAssembly (WASI `.wat`)
-- [x] Functions, structs, methods, enums + `match`
+- [x] Functions + **function values** (`f = double; f(21)`), structs, methods, enums + `match`
 - [x] Modules, `pub`, traits, generics, `?`
 - [x] Control flow: `if` / `for` / **`while` / `break` / `continue`**
 - [x] Types: Number, **Float**, String, Bool, List, **Map**, structs, enums
@@ -100,7 +100,7 @@ cargo run --release -- pkg init myapp
 
 ```
 PureLang/
-├── compiler/           # purec v0.27.0 (Rust)
+├── compiler/           # purec v0.28.0 (Rust)
 │   └── src/            # lexer → parser → checker → codegen / wasm / lsp / pkg
 ├── runtime/            # purelang_rt.c (maps, UI, time_ms, strings)
 ├── docs/               # architecture, syntax, platforms, UI, package, …

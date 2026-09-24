@@ -2,7 +2,7 @@
 
 ## Overview
 
-**`purec` v0.27.0** — Rust implementation (edition 2024).
+**`purec` v0.28.0** — Rust implementation (edition 2024).
 
 ```
 Source (.pure)
@@ -17,7 +17,7 @@ Source (.pure)
 
 ```
 compiler/
-├── Cargo.toml          # purec 0.27.0
+├── Cargo.toml          # purec 0.28.0
 └── src/
     ├── main.rs         # CLI: compile, IR, WASM, fmt, lsp, pkg, --platform
     ├── token.rs        # Token + Spanned

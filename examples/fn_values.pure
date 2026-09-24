@@ -1,0 +1,14 @@
+fn double(x) {
+    return x * 2
+}
+
+fn add(a, b) {
+    return a + b
+}
+
+fn main() {
+    f = double
+    print f(21)
+    g = add
+    print g(40, 2)
+}
