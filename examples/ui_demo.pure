@@ -1,0 +1,13 @@
+// PureLang UI — writes purelang_ui.html (open in a browser)
+
+fn main() {
+    ui_begin("PureLang Demo", 520, 360)
+    ui_label("Welcome to PureLang UI")
+    ui_text("This interface was generated from PureLang source.")
+    ui_text("Maps, while-loops, and the stdlib power the language.")
+    ui_button("Click me")
+    ui_button("Another action")
+    ui_text("Edit examples/ui_demo.pure and recompile to change this UI.")
+    n = ui_end()
+    print n
+}

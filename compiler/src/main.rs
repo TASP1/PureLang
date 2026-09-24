@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.19.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.20.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
@@ -319,6 +319,27 @@ fn main() {
         }
     }
     cmd.arg("-o").arg(&bin_path).arg(&ir_path);
+    // Link PureLang runtime (maps + UI)
+    let rt_candidates = [
+        Path::new("runtime/purelang_rt.c").to_path_buf(),
+        Path::new("../runtime/purelang_rt.c").to_path_buf(),
+        Path::new("../../runtime/purelang_rt.c").to_path_buf(),
+        // When running from compiler/ directory after cargo build
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../runtime/purelang_rt.c"),
+    ];
+    let mut linked_rt = false;
+    for c in &rt_candidates {
+        if c.exists() {
+            cmd.arg(c);
+            linked_rt = true;
+            break;
+        }
+    }
+    if !linked_rt {
+        eprintln!(
+            "warning: purelang_rt.c not found — map/ui builtins need runtime/purelang_rt.c"
+        );
+    }
 
     let status = cmd.status();
     match status {

@@ -1,0 +1,13 @@
+// Map: string keys → number values
+
+fn main() {
+    m = map_new()
+    map_set(m, "apples", 3)
+    map_set(m, "oranges", 7)
+    map_set(m, "apples", 5)
+    print map_len(m)
+    print map_get(m, "apples")
+    print map_get(m, "oranges")
+    print map_has(m, "apples")
+    print map_has(m, "bananas")
+}

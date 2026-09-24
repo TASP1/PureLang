@@ -62,9 +62,11 @@
 - [x] List helpers (`list_len`, `list_get`, `list_sum`)
 - [x] Formatter (`purec --fmt`)
 - [x] Language Server (`purec --lsp`)
-- [x] Package manager foundation (`purec pkg`)
+- [x] Package manager foundation
+- [x] HTML UI foundation (`ui_*` → purelang_ui.html) (`purec pkg`)
 - [x] Platform presets (android/ios/console/…)
-- Core collections (Vec, Map, etc.) — partial (List built-in)
+- [x] Maps (string → number) via runtime
+- Core collections (Vec, richer Map) — partial
 - File I/O, networking, concurrency primitives
 - Formatter (`pure fmt`)
 - Language Server (LSP)

@@ -293,3 +293,34 @@ fn main() {
 
 Functions: `abs`, `min`, `max`, `pow`, `sqrt`, `floor`, `ceil`, `round`, `sin`, `cos`, `tan`, `log`, `exp`
 (and the same under the `std.` prefix).
+
+
+### Maps
+
+String keys → number values (runtime `PLMap`):
+
+```pure
+fn main() {
+    m = map_new()
+    map_set(m, "score", 42)
+    print map_get(m, "score")
+    print map_has(m, "score")
+    print map_len(m)
+}
+```
+
+### UI (HTML)
+
+Generates `purelang_ui.html` in the working directory:
+
+```pure
+fn main() {
+    ui_begin("My App", 480, 320)
+    ui_label("Hello")
+    ui_text("Built with PureLang")
+    ui_button("OK")
+    ui_end()
+}
+```
+
+Open `purelang_ui.html` in a browser.

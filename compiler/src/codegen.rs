@@ -34,6 +34,7 @@ pub struct Codegen {
 enum VarKind {
     Number,
     String,
+    Map,
     /// Pointer to a struct value on the stack
     Struct,
     /// Pointer to heap list: [i64 len][i64 elems...]
@@ -286,6 +287,17 @@ impl Codegen {
             .push_str("declare i32 @snprintf(ptr, i64, ptr, ...)\n");
         self.preamble.push_str("declare void @free(ptr)\n");
         self.preamble.push_str("declare void @exit(i32)\n");
+        // PureLang runtime (maps + UI)
+        self.preamble.push_str("declare ptr @pl_map_new()\n");
+        self.preamble.push_str("declare void @pl_map_set(ptr, ptr, i64)\n");
+        self.preamble.push_str("declare i64 @pl_map_get(ptr, ptr)\n");
+        self.preamble.push_str("declare i64 @pl_map_has(ptr, ptr)\n");
+        self.preamble.push_str("declare i64 @pl_map_len(ptr)\n");
+        self.preamble.push_str("declare void @pl_ui_begin(ptr, i64, i64)\n");
+        self.preamble.push_str("declare void @pl_ui_text(ptr)\n");
+        self.preamble.push_str("declare void @pl_ui_button(ptr)\n");
+        self.preamble.push_str("declare void @pl_ui_label(ptr)\n");
+        self.preamble.push_str("declare i64 @pl_ui_end()\n");
         self.preamble.push_str("declare ptr @fopen(ptr, ptr)\n");
         self.preamble
             .push_str("declare i64 @fread(ptr, i64, i64, ptr)\n");
@@ -475,7 +487,7 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String | VarKind::Struct | VarKind::List => {
+                        VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -488,7 +500,7 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String | VarKind::Struct | VarKind::List => {
+                        VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
                             let _ = writeln!(self.body, "  {} = alloca ptr, align 8", ptr);
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
@@ -505,7 +517,7 @@ impl Codegen {
                             let _ =
                                 writeln!(self.body, "  store i64 {}, ptr {}, align 8", val, ptr);
                         }
-                        VarKind::String | VarKind::Struct | VarKind::List => {
+                        VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
                             let _ =
                                 writeln!(self.body, "  store ptr {}, ptr {}, align 8", val, ptr);
                         }
@@ -864,7 +876,7 @@ impl Codegen {
                     fmt, val
                 );
             }
-            VarKind::Struct | VarKind::List => {
+            VarKind::Struct | VarKind::List | VarKind::Map => {
                 let fmt = self.fresh();
                 let _ = writeln!(
                     self.body,
@@ -908,7 +920,7 @@ impl Codegen {
                                 loaded, ptr
                             );
                         }
-                        VarKind::String | VarKind::Struct | VarKind::List => {
+                        VarKind::String | VarKind::Struct | VarKind::List | VarKind::Map => {
                             let _ = writeln!(
                                 self.body,
                                 "  {} = load ptr, ptr {}, align 8",
@@ -1063,6 +1075,78 @@ impl Codegen {
                         let _ = writeln!(self.body, "  unreachable");
                         let _ = writeln!(self.body, "{}:", pass);
                         return ("1".into(), VarKind::Number);
+                    }
+                    // Runtime maps
+                    if builtin == "map_new" {
+                        let res = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call ptr @pl_map_new()", res);
+                        return (res, VarKind::Map);
+                    }
+                    if builtin == "map_set" {
+                        let (m, _) = self.emit_expr(&args[0]);
+                        let (k, _) = self.emit_expr(&args[1]);
+                        let (v, _) = self.emit_expr(&args[2]);
+                        let _ = writeln!(
+                            self.body,
+                            "  call void @pl_map_set(ptr {}, ptr {}, i64 {})",
+                            m, k, v
+                        );
+                        return ("1".into(), VarKind::Number);
+                    }
+                    if builtin == "map_get" {
+                        let (m, _) = self.emit_expr(&args[0]);
+                        let (k, _) = self.emit_expr(&args[1]);
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call i64 @pl_map_get(ptr {}, ptr {})",
+                            res, m, k
+                        );
+                        return (res, VarKind::Number);
+                    }
+                    if builtin == "map_has" {
+                        let (m, _) = self.emit_expr(&args[0]);
+                        let (k, _) = self.emit_expr(&args[1]);
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call i64 @pl_map_has(ptr {}, ptr {})",
+                            res, m, k
+                        );
+                        return (res, VarKind::Number);
+                    }
+                    if builtin == "map_len" {
+                        let (m, _) = self.emit_expr(&args[0]);
+                        let res = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call i64 @pl_map_len(ptr {})", res, m);
+                        return (res, VarKind::Number);
+                    }
+                    // UI
+                    if builtin == "ui_begin" {
+                        let (title, _) = self.emit_expr(&args[0]);
+                        let (w, _) = self.emit_expr(&args[1]);
+                        let (h, _) = self.emit_expr(&args[2]);
+                        let _ = writeln!(
+                            self.body,
+                            "  call void @pl_ui_begin(ptr {}, i64 {}, i64 {})",
+                            title, w, h
+                        );
+                        return ("1".into(), VarKind::Number);
+                    }
+                    if builtin == "ui_text" || builtin == "ui_button" || builtin == "ui_label" {
+                        let (s, _) = self.emit_expr(&args[0]);
+                        let fn_name = match builtin {
+                            "ui_text" => "pl_ui_text",
+                            "ui_button" => "pl_ui_button",
+                            _ => "pl_ui_label",
+                        };
+                        let _ = writeln!(self.body, "  call void @{}(ptr {})", fn_name, s);
+                        return ("1".into(), VarKind::Number);
+                    }
+                    if builtin == "ui_end" {
+                        let res = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call i64 @pl_ui_end()", res);
+                        return (res, VarKind::Number);
                     }
                     let is_math = matches!(
                         builtin,
@@ -1914,7 +1998,7 @@ impl Codegen {
     fn ensure_string(&mut self, val: String, kind: VarKind) -> String {
         match kind {
             VarKind::String => val,
-            VarKind::Struct | VarKind::List => val,
+            VarKind::Struct | VarKind::List | VarKind::Map => val,
             VarKind::Number | VarKind::Enum => {
                 let buf = self.fresh();
                 let _ = writeln!(self.body, "  {} = call ptr @malloc(i64 32)", buf);

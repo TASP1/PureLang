@@ -17,6 +17,8 @@ pub enum Type {
     Enum(String),
     /// Generic type parameter (T, U, ...)
     Generic(String),
+    /// Map (string keys → number values) — runtime PLMap*
+    Map,
     /// Function type (params -> return)
     Function {
         params: Vec<Type>,
@@ -74,6 +76,7 @@ impl fmt::Display for Type {
             Type::Struct(name) => write!(f, "{name}"),
             Type::Enum(name) => write!(f, "{name}"),
             Type::Generic(name) => write!(f, "{name}"),
+            Type::Map => write!(f, "Map"),
             Type::Function { params, ret } => {
                 let ps: Vec<String> = params.iter().map(|p| p.to_string()).collect();
                 write!(f, "fn({}) -> {}", ps.join(", "), ret)
