@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.22.0**
+**Compiler:** `purec` **v0.23.0**
 
 ## Quick Example
 
@@ -31,46 +31,49 @@ fn main() {
     p = Point(3, 4)
     print p.sum()
     nums = [10, 20, 30]
-    print nums.length
+    print list_sum(nums)
     print sqrt(49)
+    print time_ms()
 }
 ```
 
 ## Current Status (September 2026)
 
-### Done
-- [x] Public repository & design documents
-- [x] **Lexer / Parser / AST**
-- [x] **Type checker + ownership / borrows**
-- [x] **LLVM codegen** → native binaries (`clang`)
-- [x] **WebAssembly** (WASI `.wat`)
-- [x] **Functions** (define, call, return, typed params)
-- [x] **Structs** + **methods** (`fn Point.sum(self)`)
-- [x] **Lists** (literal, `.length`, index, `for x in list`)
-- [x] **Enums + match**
-- [x] **Modules** + **visibility** (`pub`)
-- [x] **Traits** + **generics**
-- [x] **Error handling** (`?`)
-- [x] **Stdlib math** (`abs`, `min`, `max`, `pow`, `sqrt`, … + `std.*`)
-- [x] CI on **public** GitHub Actions (free minutes + Rust cache)
-- [x] **while / break / continue**
-- [x] **Float** type (decimal literals + ops)
-- [x] **Ownership** edge cases (move / use-after-move, map+string borrow)
-- [x] **String helpers** (`str_contains`, `str_eq`, `str_concat`, `str_from_num`)
-- [x] **Maps** (`map_new` / `map_set` / `map_get`)
-- [x] **UI** (`ui_begin` … → `purelang_ui.html`)
-- [x] **assert** builtin
-- [x] **Multi-platform**: Linux, Windows, macOS CI + `--target` / `--opt`
+### Language & compiler
+- [x] Lexer / parser / AST (line-accurate tokens & parse errors)
+- [x] Type checker + ownership / borrows (errors with line numbers)
+- [x] LLVM native codegen (`clang`) + WebAssembly (WASI `.wat`)
+- [x] Functions, structs, methods, enums + `match`
+- [x] Modules, `pub`, traits, generics, `?`
+- [x] Control flow: `if` / `for` / **`while` / `break` / `continue`**
+- [x] Types: Number, **Float**, String, Bool, List, **Map**, structs, enums
+- [x] **assert**, **exit**, **time_ms**
+
+### Standard library
+- [x] Math (`abs`, `min`, `max`, `pow`, `sqrt`, trig, … + `std.*`)
+- [x] File I/O (`read_file`, `write_file`, `file_exists`)
+- [x] Lists (`list_len` / `list_get` / `list_sum` / `list_max` / `list_min`)
+- [x] Strings (`str_len`, `str_is_empty`, `str_contains`, `str_eq`, `str_concat`, `str_from_num`)
+- [x] Maps (`map_new` / `map_set` / `map_get` / `map_has` / `map_len`)
+- [x] HTML UI foundation (`ui_begin` … → `purelang_ui.html`)
+
+### Tooling & platforms
+- [x] Formatter (`purec --fmt`)
+- [x] LSP (`purec --lsp` — diagnostics, hover, completions)
+- [x] Package manager (`purec pkg init|add|list|build`)
+- [x] Platform presets (`--platform android|ios|linux|macos|windows|console`)
+- [x] CI: **Linux / Windows / macOS** (public free Actions + Rust cache)
+- [x] Golden output tests (`tests/run.sh`)
 
 ### Next
 - [ ] Networking & concurrency
-- [ ] Native UI backends
-- [ ] Cross-compile sysroots (iOS / Android)
-- [ ] Self-hosting
+- [ ] Native UI backends (beyond HTML export)
+- [ ] iOS / Android sysroot automation
+- [ ] Self-hosting compiler
 
 ## Try it
 
-Requires: **Rust** (stable), **clang** (native), optional **wasmtime** (WASM).
+Requires: **Rust** (stable), **clang**, optional **wasmtime**.
 
 ```bash
 git clone https://github.com/TASP1/PureLang.git
@@ -80,46 +83,41 @@ cargo build --release
 cargo run --release -- ../examples/hello.pure
 cargo run --release -- --compile -o hello ../examples/hello.pure && ./hello
 
-# More examples
-for f in funcs structs lists list_loop methods enums ownership \
-         typed_params try_op modules generics traits visibility stdlib; do
-  cargo run --release -- --compile -o /tmp/$f ../examples/$f.pure && /tmp/$f
-done
+# Formatter / LSP / packages
+cargo run --release -- --fmt ../examples/hello.pure
+cargo run --release -- --lsp
+cargo run --release -- pkg init myapp
 
-cargo run --release -- --emit-wasm ../examples/hello.pure
-wasmtime hello.wat
+# Tests
+../tests/run.sh
 ```
 
-## Project Structure
+## Project structure
 
 ```
 PureLang/
-├── compiler/                 # purec v0.22.0 (Rust)
-│   └── src/
-│       ├── main.rs           # CLI
-│       ├── lexer.rs / token.rs
-│       ├── parser.rs / ast.rs
-│       ├── types.rs / checker.rs
-│       ├── codegen.rs        # LLVM IR → native
-│       └── wasm.rs           # WASI .wat
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SYNTAX.md
-│   ├── MEMORY_MODEL.md
-│   ├── COMPILER.md
-│   └── ROADMAP.md
-├── examples/                 # 17 .pure programs
-└── .github/workflows/ci.yml  # public free Actions + rust-cache
+├── compiler/           # purec v0.23.0 (Rust)
+│   └── src/            # lexer → parser → checker → codegen / wasm / lsp / pkg
+├── runtime/            # purelang_rt.c (maps, UI, time_ms, strings)
+├── docs/               # architecture, syntax, platforms, UI, package, …
+├── examples/           # 25+ .pure programs
+├── tests/              # golden expected outputs + run.sh
+├── editors/vscode/     # generic LSP client notes
+└── .github/workflows/  # multi-OS CI
 ```
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Syntax](docs/SYNTAX.md)
-- [Memory Model](docs/MEMORY_MODEL.md)
-- [Compiler Design](docs/COMPILER.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Platforms](docs/PLATFORMS.md)
+| Doc | Topic |
+|-----|--------|
+| [Architecture](docs/ARCHITECTURE.md) | Pipeline & design |
+| [Syntax](docs/SYNTAX.md) | Language surface |
+| [Memory model](docs/MEMORY_MODEL.md) | Ownership |
+| [Compiler](docs/COMPILER.md) | purec internals |
+| [Platforms](docs/PLATFORMS.md) | Desktop / mobile / console |
+| [Package manager](docs/PACKAGE.md) | `purec pkg` |
+| [UI](docs/UI.md) | HTML UI export |
+| [Roadmap](docs/ROADMAP.md) | Phases |
 
 ## License
 

@@ -2,80 +2,75 @@
 
 ## Overview
 
-The PureLang compiler is **`purec`**, written in Rust.
-
-**Current version: v0.18.0**
-
-Pipeline:
+**`purec` v0.23.0** — Rust implementation (edition 2024).
 
 ```
 Source (.pure)
-  → Lexer → Parser → AST
+  → Lexer (Spanned tokens, line numbers)
+  → Parser → AST (StmtNode with lines)
   → Type checker + ownership / borrows
-  → LLVM IR text  →  clang  →  native binary
-  → WASI .wat     →  wasmtime / browsers
+  → LLVM IR text → clang (+ purelang_rt.c, -lm) → native binary
+  → WASI .wat ( --emit-wasm )
 ```
 
 ## Layout
 
 ```
 compiler/
-├── Cargo.toml          # purec 0.11.0, edition 2024
+├── Cargo.toml          # purec 0.23.0
 └── src/
-    ├── main.rs         # CLI (--compile, --emit-ir, --emit-wasm, …)
-    ├── token.rs
+    ├── main.rs         # CLI: compile, IR, WASM, fmt, lsp, pkg, --platform
+    ├── token.rs        # Token + Spanned
     ├── lexer.rs
-    ├── ast.rs
-    ├── parser.rs       # recursive descent + Pratt
+    ├── ast.rs          # Program, Item, StmtNode, Expr, …
+    ├── parser.rs
     ├── types.rs
-    ├── checker.rs      # types, ownership, modules, traits, generics
-    ├── codegen.rs      # LLVM IR (opaque pointers) + libm builtins
-    └── wasm.rs         # WebAssembly Text (WASI)
+    ├── checker.rs
+    ├── codegen.rs      # LLVM IR + stdlib/runtime calls
+    ├── wasm.rs
+    ├── fmt.rs
+    ├── lsp.rs
+    ├── pkg.rs
+    └── platforms.rs
+runtime/
+└── purelang_rt.c       # maps, string helpers, HTML UI, time_ms
 ```
 
-## Implemented
+## Implemented stages
 
 | Stage | Status |
 |-------|--------|
-| Lexing | ✅ |
+| Lexing (with lines) | ✅ |
 | Parsing → AST | ✅ |
-| Type checking | ✅ |
-| Ownership / borrows (MVP+) | ✅ |
-| LLVM native codegen | ✅ |
-| WASM backend | ✅ |
-| Functions, structs, methods | ✅ |
-| Lists, for-in | ✅ |
-| Enums + match | ✅ |
-| Modules + `pub` | ✅ |
-| Generics + traits | ✅ |
-| `?` on Result/Option-style enums | ✅ |
-| Math stdlib via libm | ✅ |
+| Type + ownership checking | ✅ |
+| LLVM native | ✅ |
+| WASM (WASI) | ✅ |
+| Formatter | ✅ |
+| LSP (stdio) | ✅ |
+| Package manager (path deps) | ✅ |
+| Golden tests | ✅ |
 
-## CLI
+## CLI (selected)
 
 ```bash
-purec <file.pure>              # type-check
+purec <file.pure>                 # type-check
 purec --compile -o out file.pure
-purec --target <triple> --opt 3 -o out file.pure
-purec --emit-ir file.pure
-purec --emit-wasm file.pure
-purec --ast / --tokens file.pure
+purec --target <triple> --opt 3 …
+purec --platform android|ios|linux|macos|windows|console
+purec --emit-ir / --emit-wasm
+purec --fmt file.pure
+purec --lsp
+purec pkg init|add|list|build
+purec --list-platforms
+purec --version
 ```
 
-## Technology
+## Linking
 
-- **Language:** Rust (edition 2024)
-- **Backend:** hand-written LLVM IR text + system `clang` (`-lm` for math)
-- **WASM:** WASI snapshot preview1 text format
-- **CI:** public repo, free Actions minutes, `Swatinem/rust-cache`
-
-## Diagnostics goals
-
-Precise locations, helpful messages, colored context (to be expanded).
+Native builds invoke `clang` with optimization flags, host/target triple, `-lm` on Unix, and `runtime/purelang_rt.c` when present (maps, UI, `time_ms`, string helpers).
 
 ## Next
 
-- File I/O & richer collections in stdlib
-- Formatter / LSP
-- Stronger LLVM optimization pipeline
-- Cross-compilation targets
+- Column-level diagnostics
+- Stronger incremental compilation
+- Self-hosting

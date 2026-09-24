@@ -33,7 +33,7 @@ jobs:
           test -f docs/ROADMAP.md
           test -f docs/PLATFORMS.md
           test -f LICENSE
-          for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib file_io list_helpers strings list_stats while_loop maps ui_demo; do
+          for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib file_io list_helpers strings list_stats time_exit while_loop maps ui_demo; do
             test -f examples/$f.pure
           done
 
@@ -101,14 +101,14 @@ jobs:
       - name: Type-check examples
         shell: bash
         run: |
-          for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib file_io list_helpers strings list_stats while_loop maps ui_demo; do
+          for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib file_io list_helpers strings list_stats time_exit while_loop maps ui_demo; do
             cargo run --release -- ../examples/$f.pure
           done
 
       - name: Compile & run examples (native)
         shell: bash
         run: |
-          for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib file_io list_helpers strings list_stats while_loop maps ui_demo; do
+          for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib file_io list_helpers strings list_stats time_exit while_loop maps ui_demo; do
             cargo run --release -- --compile -o ../tmp_$f ../examples/$f.pure
             echo "=== $f ==="
             ../tmp_$f || ../tmp_$f.exe || true

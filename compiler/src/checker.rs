@@ -124,6 +124,11 @@ impl TypeChecker {
             ("std_map_get", vec![Map, String], Number),
             ("std_map_has", vec![Map, String], Number),
             ("std_map_len", vec![Map], Number),
+            // Process / time
+            ("exit", vec![Number], Number),
+            ("time_ms", vec![], Number),
+            ("std_exit", vec![Number], Number),
+            ("std_time_ms", vec![], Number),
             // UI (HTML output via runtime)
             ("ui_begin", vec![String, Number, Number], Number),
             ("ui_text", vec![String], Number),

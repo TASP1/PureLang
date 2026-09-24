@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <time.h>
 
 #define PL_MAP_CAP 128
 
@@ -142,4 +143,13 @@ char *pl_str_from_num(int64_t n) {
     if (!out) return NULL;
     snprintf(out, 32, "%lld", (long long)n);
     return out;
+}
+
+
+int64_t pl_time_ms(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        return 0;
+    }
+    return (int64_t)ts.tv_sec * 1000 + (int64_t)ts.tv_nsec / 1000000;
 }

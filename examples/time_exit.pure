@@ -1,0 +1,6 @@
+// Process builtins: time_ms (monotonic milliseconds)
+
+fn main() {
+    print time_ms()
+    print time_ms()
+}

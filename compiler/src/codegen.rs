@@ -303,6 +303,7 @@ impl Codegen {
         self.preamble.push_str("declare void @pl_ui_button(ptr)\n");
         self.preamble.push_str("declare void @pl_ui_label(ptr)\n");
         self.preamble.push_str("declare i64 @pl_ui_end()\n");
+        self.preamble.push_str("declare i64 @pl_time_ms()\n");
         self.preamble
             .push_str("declare i64 @pl_str_contains(ptr, ptr)\n");
         self.preamble.push_str("declare i64 @pl_str_eq(ptr, ptr)\n");
@@ -1196,6 +1197,19 @@ impl Codegen {
                         let _ = writeln!(self.body, "  unreachable");
                         let _ = writeln!(self.body, "{}:", pass);
                         return ("1".into(), VarKind::Number);
+                    }
+                    if builtin == "exit" {
+                        let (code, _) = self.emit_expr(&args[0]);
+                        let c32 = self.fresh();
+                        let _ = writeln!(self.body, "  {} = trunc i64 {} to i32", c32, code);
+                        let _ = writeln!(self.body, "  call void @exit(i32 {})", c32);
+                        let _ = writeln!(self.body, "  unreachable");
+                        return ("0".into(), VarKind::Number);
+                    }
+                    if builtin == "time_ms" {
+                        let res = self.fresh();
+                        let _ = writeln!(self.body, "  {} = call i64 @pl_time_ms()", res);
+                        return (res, VarKind::Number);
                     }
                     // Runtime maps
                     if builtin == "map_new" {

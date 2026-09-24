@@ -43,6 +43,11 @@
 - [x] Visibility
 - [x] while / break / continue
 - [x] assert builtin (`pub` enforced across modules)
+- [x] Float type
+- [x] Maps + HTML UI foundation
+- [x] String helpers + list stats
+- [x] exit / time_ms process builtins
+- [x] Golden tests
 
 ## Phase 3 — Performance & Platforms
 

@@ -2,73 +2,42 @@
 
 ## Vision
 
-PureLang is a modern systems programming language designed for:
+Systems language for extreme performance (games, engines, AI), memory safety without GC, and syntax simpler than Python — native on desktop, web (WASM), and eventually mobile/consoles.
 
-- Extreme performance (games, engines, 3D, AI)
-- Absolute memory safety without garbage collection
-- Syntax that is significantly easier than Python
-- Native execution on every major platform (including consoles)
-
-## High-Level Pipeline
+## Pipeline
 
 ```
-PureLang Source (.pure)
-        │
-        ▼
-   Lexer  ✅
-        │
-        ▼
-   Parser → AST  ✅
-        │
-        ▼
-   Type Checker + Ownership / Borrow Checker  ✅
-        │
-        ▼
-   Code generation
-        │
-        ├──────────────────────┐
-        ▼                      ▼
-   LLVM IR ✅              WebAssembly ✅
-        │                      │
-        ▼                      ▼
- Native Binary              .wat / WASI
- (Linux today; more         (wasmtime, browsers)
-  targets planned)
+.pure → Lexer → Parser → AST
+         → Type / ownership checker
+         → Codegen
+              ├─ LLVM IR → clang → native (Linux / macOS / Windows)
+              └─ WASI .wat → wasmtime / browsers
 ```
 
-## Compiler Implementation
+## Compiler
 
-- Written entirely in **Rust** (`purec` **v0.11.0**)
+- Written in **Rust** (`purec` **v0.23.0**)
 - Hand-written recursive-descent parser
-- LLVM IR emitted as text; linked with `clang`
-- Math via **libm** (`-lm`)
+- LLVM IR as text; link with system `clang` + **purelang_rt.c**
+- Optional LSP and package manager built into the same binary
 
-### Why Rust for the compiler?
+## Design choices
 
-- Memory safety for the compiler itself
-- Strong ecosystem and tooling
-- Fast, reliable CI builds with caching
+| Area | Choice |
+|------|--------|
+| Syntax | Braces, immutable by default, minimal ceremony |
+| Safety | Ownership + borrows at compile time |
+| Numbers | `Number` (i64) + `Float` (f64) |
+| Collections | Built-in lists; maps via runtime |
+| UI (MVP) | Emit static HTML (`purelang_ui.html`) |
+| Platforms | `--platform` presets + `ANDROID_NDK` / `PUREC_SYSROOT` |
 
-## Key Design Decisions
+## Platform strategy
 
-| Area            | Decision                         | Reason                |
-|-----------------|----------------------------------|------------------------|
-| Syntax          | Simple, braces, immutable default | Ease of use          |
-| Memory safety   | Ownership + borrowing (compile-time) | Zero-cost safety  |
-| Backend         | LLVM + WebAssembly               | Performance + reach   |
-| Interop         | C ABI (via clang)                | SDKs, existing libs   |
-| Stdlib math     | libm builtins                    | Portable numerics     |
-
-## Platform Strategy
-
-- **Desktop:** LLVM native (Linux working; Windows/macOS planned)
-- **Web:** WebAssembly / WASI
-- **Mobile / consoles:** via C ABI + platform SDKs (future)
+- **Desktop:** CI on Ubuntu, Windows, macOS
+- **Web:** WASM / WASI
+- **Mobile / console:** IR + clang triples; sysroots required for real devices
 
 ## Extensibility
 
-- Stronger optimization pipeline
-- Possible Cranelift debug backend
-- Incremental compilation for game-style iteration
-
-This architecture reuses proven infrastructure (LLVM) while focusing innovation on language design and developer experience.
+Future: richer stdlib, native UI backends, concurrency, self-hosting.

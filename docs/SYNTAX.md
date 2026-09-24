@@ -358,3 +358,41 @@ fn main() {
 - **String** and **Map** move by default when assigned or passed by value.
 - Field access, indexing, `print`, and reading builtins (`str_len`, `map_get`, …) **borrow**.
 - Use after move is a type error.
+
+
+### Process & time
+
+```pure
+fn main() {
+    t = time_ms()   // monotonic milliseconds
+    print t
+    // exit(0)      // terminate process with code
+}
+```
+
+### Maps
+
+```pure
+fn main() {
+    m = map_new()
+    map_set(m, "score", 42)
+    print map_get(m, "score")
+    print map_has(m, "score")
+    print map_len(m)
+}
+```
+
+### while / break / continue
+
+```pure
+fn main() {
+    mut i = 0
+    while i < 5 {
+        i = i + 1
+        if i == 3 {
+            continue
+        }
+        print i
+    }
+}
+```
