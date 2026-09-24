@@ -163,6 +163,10 @@ impl TypeChecker {
             ("std_list_max", vec![List(Box::new(Number))], Number),
             ("std_list_min", vec![List(Box::new(Number))], Number),
             ("std_str_is_empty", vec![String], Number),
+            ("str_char_at", vec![String, Number], Number),
+            ("str_slice", vec![String, Number, Number], String),
+            ("std_str_char_at", vec![String, Number], Number),
+            ("std_str_slice", vec![String, Number, Number], String),
             ("str_contains", vec![String, String], Number),
             ("str_eq", vec![String, String], Number),
             ("str_concat", vec![String, String], String),
@@ -1080,7 +1084,8 @@ impl TypeChecker {
     fn arg_should_borrow(callee_name: &str, arg_index: usize) -> bool {
         let name = callee_name.strip_prefix("std_").unwrap_or(callee_name);
         match name {
-            "str_len" | "str_is_empty" | "str_contains" | "str_eq" | "str_concat" => true,
+            "str_len" | "str_is_empty" | "str_contains" | "str_eq" | "str_concat"
+            | "str_char_at" | "str_slice" => true,
             "str_from_num" => false,
             "map_get" | "map_has" | "map_len" => true,
             "map_set" => arg_index == 0 || arg_index == 1, // map + key borrowed; value is Number

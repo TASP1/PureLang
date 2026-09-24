@@ -1,4 +1,4 @@
-# PureLang completion status (v0.26.0)
+# PureLang completion status (v0.27.0)
 
 Honest snapshot of the five “complete all” tracks.
 
@@ -15,3 +15,7 @@ Honest snapshot of the five “complete all” tracks.
 These foundations are **usable for demos and further development**. They are **not** substitutes for mature runtimes (Tokio, NSURLSession, SwiftUI, full purec-in-PureLang).
 
 Next engineering priority: deepen one track at a time (likely channels → real `spawn(fn)` once function values exist).
+
+
+## v0.27.0
+- str_char_at / str_slice — bootstrap lexer progress

@@ -154,6 +154,28 @@ char *pl_str_from_num(int64_t n) {
 }
 
 
+int64_t pl_str_char_at(char *s, int64_t i) {
+    if (!s || i < 0) return -1;
+    size_t n = strlen(s);
+    if ((size_t)i >= n) return -1;
+    return (unsigned char)s[i];
+}
+
+char *pl_str_slice(char *s, int64_t start, int64_t end) {
+    if (!s) return (char *)calloc(1, 1);
+    size_t n = strlen(s);
+    if (start < 0) start = 0;
+    if (end < start) end = start;
+    if ((size_t)start > n) start = (int64_t)n;
+    if ((size_t)end > n) end = (int64_t)n;
+    size_t len = (size_t)(end - start);
+    char *out = (char *)malloc(len + 1);
+    if (!out) return (char *)calloc(1, 1);
+    memcpy(out, s + start, len);
+    out[len] = '\0';
+    return out;
+}
+
 int64_t pl_time_ms(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;

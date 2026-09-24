@@ -323,6 +323,8 @@ impl Codegen {
             .push_str("declare ptr @pl_str_concat(ptr, ptr)\n");
         self.preamble
             .push_str("declare ptr @pl_str_from_num(i64)\n");
+        self.preamble.push_str("declare i64 @pl_str_char_at(ptr, i64)\n");
+        self.preamble.push_str("declare ptr @pl_str_slice(ptr, i64, i64)\n");
         self.preamble.push_str("declare ptr @fopen(ptr, ptr)\n");
         self.preamble
             .push_str("declare i64 @fread(ptr, i64, i64, ptr)\n");
@@ -1415,6 +1417,41 @@ impl Codegen {
                             self.body,
                             "  {} = call ptr @pl_str_from_num(i64 {})",
                             res, n
+                        );
+                        return (res, VarKind::String);
+                    }
+
+                    if builtin == "str_char_at" {
+                        if args.len() != 2 {
+                            self.errors
+                                .push("codegen: str_char_at expects 2 args".into());
+                            return ("0".into(), VarKind::Number);
+                        }
+                        let (s, sk) = self.emit_expr(&args[0]);
+                        let sp = self.ensure_string(s, sk);
+                        let (i, _) = self.emit_expr(&args[1]);
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call i64 @pl_str_char_at(ptr {}, i64 {})",
+                            res, sp, i
+                        );
+                        return (res, VarKind::Number);
+                    }
+                    if builtin == "str_slice" {
+                        if args.len() != 3 {
+                            self.errors.push("codegen: str_slice expects 3 args".into());
+                            return ("0".into(), VarKind::String);
+                        }
+                        let (s, sk) = self.emit_expr(&args[0]);
+                        let sp = self.ensure_string(s, sk);
+                        let (a, _) = self.emit_expr(&args[1]);
+                        let (b, _) = self.emit_expr(&args[2]);
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call ptr @pl_str_slice(ptr {}, i64 {}, i64 {})",
+                            res, sp, a, b
                         );
                         return (res, VarKind::String);
                     }

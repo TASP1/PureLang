@@ -1,0 +1,7 @@
+fn main() {
+    s = "Pure"
+    print str_char_at(s, 0)
+    print str_char_at(s, 1)
+    print str_slice(s, 1, 4)
+    print str_len(str_slice(s, 0, 2))
+}

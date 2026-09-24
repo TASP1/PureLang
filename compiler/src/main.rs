@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.26.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.27.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
