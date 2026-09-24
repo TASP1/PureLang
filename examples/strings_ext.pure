@@ -1,0 +1,14 @@
+// Richer string helpers
+
+fn main() {
+    print str_contains("PureLang", "Lang")
+    print str_contains("PureLang", "xyz")
+    print str_eq("hi", "hi")
+    print str_eq("hi", "ho")
+    s = str_concat("Hello, ", "PureLang")
+    print s
+    print str_len(s)
+    n = str_from_num(42)
+    print n
+    print str_concat("score=", n)
+}

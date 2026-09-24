@@ -138,6 +138,14 @@ impl TypeChecker {
             ("std_list_max", vec![List(Box::new(Number))], Number),
             ("std_list_min", vec![List(Box::new(Number))], Number),
             ("std_str_is_empty", vec![String], Number),
+            ("str_contains", vec![String, String], Number),
+            ("str_eq", vec![String, String], Number),
+            ("str_concat", vec![String, String], String),
+            ("str_from_num", vec![Number], String),
+            ("std_str_contains", vec![String, String], Number),
+            ("std_str_eq", vec![String, String], Number),
+            ("std_str_concat", vec![String, String], String),
+            ("std_str_from_num", vec![Number], String),
         ];
         for (name, params, ret) in builtins {
             self.functions.insert(

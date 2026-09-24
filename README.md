@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.20.0**
+**Compiler:** `purec` **v0.21.0**
 
 ## Quick Example
 
@@ -54,6 +54,7 @@ fn main() {
 - [x] **Stdlib math** (`abs`, `min`, `max`, `pow`, `sqrt`, … + `std.*`)
 - [x] CI on **public** GitHub Actions (free minutes + Rust cache)
 - [x] **while / break / continue**
+- [x] **String helpers** (`str_contains`, `str_eq`, `str_concat`, `str_from_num`)
 - [x] **Maps** (`map_new` / `map_set` / `map_get`)
 - [x] **UI** (`ui_begin` … → `purelang_ui.html`)
 - [x] **assert** builtin
@@ -91,7 +92,7 @@ wasmtime hello.wat
 
 ```
 PureLang/
-├── compiler/                 # purec v0.20.0 (Rust)
+├── compiler/                 # purec v0.21.0 (Rust)
 │   └── src/
 │       ├── main.rs           # CLI
 │       ├── lexer.rs / token.rs

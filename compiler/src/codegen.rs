@@ -302,6 +302,13 @@ impl Codegen {
         self.preamble.push_str("declare void @pl_ui_button(ptr)\n");
         self.preamble.push_str("declare void @pl_ui_label(ptr)\n");
         self.preamble.push_str("declare i64 @pl_ui_end()\n");
+        self.preamble
+            .push_str("declare i64 @pl_str_contains(ptr, ptr)\n");
+        self.preamble.push_str("declare i64 @pl_str_eq(ptr, ptr)\n");
+        self.preamble
+            .push_str("declare ptr @pl_str_concat(ptr, ptr)\n");
+        self.preamble
+            .push_str("declare ptr @pl_str_from_num(i64)\n");
         self.preamble.push_str("declare ptr @fopen(ptr, ptr)\n");
         self.preamble
             .push_str("declare i64 @fread(ptr, i64, i64, ptr)\n");
@@ -1151,6 +1158,49 @@ impl Codegen {
                         let res = self.fresh();
                         let _ = writeln!(self.body, "  {} = call i64 @pl_ui_end()", res);
                         return (res, VarKind::Number);
+                    }
+                    if builtin == "str_contains" {
+                        let (a, _) = self.emit_expr(&args[0]);
+                        let (b, _) = self.emit_expr(&args[1]);
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call i64 @pl_str_contains(ptr {}, ptr {})",
+                            res, a, b
+                        );
+                        return (res, VarKind::Number);
+                    }
+                    if builtin == "str_eq" {
+                        let (a, _) = self.emit_expr(&args[0]);
+                        let (b, _) = self.emit_expr(&args[1]);
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call i64 @pl_str_eq(ptr {}, ptr {})",
+                            res, a, b
+                        );
+                        return (res, VarKind::Number);
+                    }
+                    if builtin == "str_concat" {
+                        let (a, _) = self.emit_expr(&args[0]);
+                        let (b, _) = self.emit_expr(&args[1]);
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call ptr @pl_str_concat(ptr {}, ptr {})",
+                            res, a, b
+                        );
+                        return (res, VarKind::String);
+                    }
+                    if builtin == "str_from_num" {
+                        let (n, _) = self.emit_expr(&args[0]);
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call ptr @pl_str_from_num(i64 {})",
+                            res, n
+                        );
+                        return (res, VarKind::String);
                     }
                     let is_math = matches!(
                         builtin,

@@ -324,3 +324,16 @@ fn main() {
 ```
 
 Open `purelang_ui.html` in a browser.
+
+
+### String helpers
+
+```pure
+fn main() {
+    print str_contains("PureLang", "Lang")  // 1
+    print str_eq("a", "a")                  // 1
+    s = str_concat("Hello, ", "world")
+    print s
+    print str_from_num(42)
+}
+```

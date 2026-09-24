@@ -112,3 +112,34 @@ int64_t pl_ui_end(void) {
     ui_open = 0;
     return 1;
 }
+
+
+/* ---- String helpers ---- */
+int64_t pl_str_contains(char *hay, char *needle) {
+    if (!hay || !needle) return 0;
+    return strstr(hay, needle) != NULL ? 1 : 0;
+}
+
+int64_t pl_str_eq(char *a, char *b) {
+    if (!a && !b) return 1;
+    if (!a || !b) return 0;
+    return strcmp(a, b) == 0 ? 1 : 0;
+}
+
+char *pl_str_concat(char *a, char *b) {
+    size_t la = a ? strlen(a) : 0;
+    size_t lb = b ? strlen(b) : 0;
+    char *out = (char *)malloc(la + lb + 1);
+    if (!out) return NULL;
+    if (a) memcpy(out, a, la); else la = 0;
+    if (b) memcpy(out + la, b, lb);
+    out[la + lb] = '\0';
+    return out;
+}
+
+char *pl_str_from_num(int64_t n) {
+    char *out = (char *)malloc(32);
+    if (!out) return NULL;
+    snprintf(out, 32, "%lld", (long long)n);
+    return out;
+}

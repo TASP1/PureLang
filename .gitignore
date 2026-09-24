@@ -1,3 +1,5 @@
 purelang_ui.html
 *.ll
 /tmp/
+*.ll
+purelang_test*.txt
