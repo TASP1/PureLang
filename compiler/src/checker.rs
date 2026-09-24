@@ -135,7 +135,6 @@ impl TypeChecker {
             ("std_ui_button", vec![String], Number),
             ("std_ui_label", vec![String], Number),
             ("std_ui_end", vec![], Number),
-
             ("std_list_max", vec![List(Box::new(Number))], Number),
             ("std_list_min", vec![List(Box::new(Number))], Number),
             ("std_str_is_empty", vec![String], Number),

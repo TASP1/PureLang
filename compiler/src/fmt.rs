@@ -226,7 +226,7 @@ fn format_stmt(stmt: &Stmt, out: &mut String, level: usize) {
             }
             out.push('\n');
         }
-                Stmt::While { condition, body } => {
+        Stmt::While { condition, body } => {
             out.push_str(&indent(level));
             out.push_str("while ");
             format_expr(condition, out);

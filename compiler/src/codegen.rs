@@ -289,11 +289,15 @@ impl Codegen {
         self.preamble.push_str("declare void @exit(i32)\n");
         // PureLang runtime (maps + UI)
         self.preamble.push_str("declare ptr @pl_map_new()\n");
-        self.preamble.push_str("declare void @pl_map_set(ptr, ptr, i64)\n");
-        self.preamble.push_str("declare i64 @pl_map_get(ptr, ptr)\n");
-        self.preamble.push_str("declare i64 @pl_map_has(ptr, ptr)\n");
+        self.preamble
+            .push_str("declare void @pl_map_set(ptr, ptr, i64)\n");
+        self.preamble
+            .push_str("declare i64 @pl_map_get(ptr, ptr)\n");
+        self.preamble
+            .push_str("declare i64 @pl_map_has(ptr, ptr)\n");
         self.preamble.push_str("declare i64 @pl_map_len(ptr)\n");
-        self.preamble.push_str("declare void @pl_ui_begin(ptr, i64, i64)\n");
+        self.preamble
+            .push_str("declare void @pl_ui_begin(ptr, i64, i64)\n");
         self.preamble.push_str("declare void @pl_ui_text(ptr)\n");
         self.preamble.push_str("declare void @pl_ui_button(ptr)\n");
         self.preamble.push_str("declare void @pl_ui_label(ptr)\n");

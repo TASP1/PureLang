@@ -112,10 +112,7 @@ pub enum Stmt {
         body: Block,
     },
     /// `while condition { ... }`
-    While {
-        condition: Expr,
-        body: Block,
-    },
+    While { condition: Expr, body: Block },
     /// `break`
     Break,
     /// `continue`

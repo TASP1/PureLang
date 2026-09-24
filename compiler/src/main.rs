@@ -336,9 +336,7 @@ fn main() {
         }
     }
     if !linked_rt {
-        eprintln!(
-            "warning: purelang_rt.c not found — map/ui builtins need runtime/purelang_rt.c"
-        );
+        eprintln!("warning: purelang_rt.c not found — map/ui builtins need runtime/purelang_rt.c");
     }
 
     let status = cmd.status();
