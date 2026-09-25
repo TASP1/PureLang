@@ -306,6 +306,8 @@ impl Codegen {
         self.preamble.push_str("declare void @pl_ui_button(ptr)\n");
         self.preamble.push_str("declare void @pl_ui_label(ptr)\n");
         self.preamble.push_str("declare i64 @pl_ui_end()\n");
+        self.preamble
+            .push_str("declare void @pl_ui_alert(ptr, ptr)\n");
         self.preamble.push_str("declare i64 @pl_time_ms()\n");
         self.preamble.push_str("declare void @pl_sleep_ms(i64)\n");
         self.preamble.push_str("declare ptr @pl_http_get(ptr)\n");
@@ -1389,6 +1391,13 @@ impl Codegen {
                         };
                         let _ = writeln!(self.body, "  call void @{}(ptr {})", fn_name, s);
                         return ("1".into(), VarKind::Number);
+                    }
+                    if builtin == "ui_alert" {
+                        let (a, _) = self.emit_expr(&args[0]);
+                        let (b, _) = self.emit_expr(&args[1]);
+                        let _ =
+                            writeln!(self.body, "  call void @pl_ui_alert(ptr {}, ptr {})", a, b);
+                        return ("0".into(), VarKind::Number);
                     }
                     if builtin == "ui_end" {
                         let res = self.fresh();

@@ -1,0 +1,152 @@
+// Self-host bootstrap: scan sample source, count letter/digit/punct runs as tokens
+
+fn main() {
+    src = "fn add(a, b) { return a + b }"
+    n = str_len(src)
+    mut i = 0
+    mut n_ident = 0
+    mut n_num = 0
+    mut n_punct = 0
+    while i < n {
+        mut c = str_char_at(src, i)
+        if c == 32 {
+            i = i + 1
+        } else {
+            if c >= 65 {
+                if c <= 90 {
+                    n_ident = n_ident + 1
+                    i = i + 1
+                    while i < n {
+                        c = str_char_at(src, i)
+                        if c >= 65 {
+                            if c <= 90 {
+                                i = i + 1
+                            } else {
+                                if c >= 97 {
+                                    if c <= 122 {
+                                        i = i + 1
+                                    } else {
+                                        if c == 95 {
+                                            i = i + 1
+                                        } else {
+                                            if c >= 48 {
+                                                if c <= 57 {
+                                                    i = i + 1
+                                                } else {
+                                                    break
+                                                }
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    if c == 95 {
+                                        i = i + 1
+                                    } else {
+                                        if c >= 48 {
+                                            if c <= 57 {
+                                                i = i + 1
+                                            } else {
+                                                break
+                                            }
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            if c >= 97 {
+                                if c <= 122 {
+                                    i = i + 1
+                                } else {
+                                    break
+                                }
+                            } else {
+                                if c == 95 {
+                                    i = i + 1
+                                } else {
+                                    if c >= 48 {
+                                        if c <= 57 {
+                                            i = i + 1
+                                        } else {
+                                            break
+                                        }
+                                    } else {
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if c >= 97 {
+                        if c <= 122 {
+                            n_ident = n_ident + 1
+                            i = i + 1
+                            while i < n {
+                                c = str_char_at(src, i)
+                                if c >= 65 {
+                                    if c <= 122 {
+                                        i = i + 1
+                                    } else {
+                                        if c == 95 {
+                                            i = i + 1
+                                        } else {
+                                            if c >= 48 {
+                                                if c <= 57 {
+                                                    i = i + 1
+                                                } else {
+                                                    break
+                                                }
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    break
+                                }
+                            }
+                        } else {
+                            n_punct = n_punct + 1
+                            i = i + 1
+                        }
+                    } else {
+                        n_punct = n_punct + 1
+                        i = i + 1
+                    }
+                }
+            } else {
+                if c >= 48 {
+                    if c <= 57 {
+                        n_num = n_num + 1
+                        i = i + 1
+                        while i < n {
+                            c = str_char_at(src, i)
+                            if c >= 48 {
+                                if c <= 57 {
+                                    i = i + 1
+                                } else {
+                                    break
+                                }
+                            } else {
+                                break
+                            }
+                        }
+                    } else {
+                        n_punct = n_punct + 1
+                        i = i + 1
+                    }
+                } else {
+                    n_punct = n_punct + 1
+                    i = i + 1
+                }
+            }
+        }
+    }
+    print n_ident
+    print n_num
+    print n_punct
+}

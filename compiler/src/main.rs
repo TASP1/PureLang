@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.30.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.31.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
@@ -290,6 +290,15 @@ fn main() {
     // Math library: libm on Unix; on Windows MSVC math is in the CRT
     if !triple.contains("windows") {
         cmd.arg("-lm");
+        // Windows: WinInet for in-process HTTP(S)
+        if triple.contains("windows") {
+            cmd.arg("-lwininet");
+        }
+        // Optional in-process libcurl (Unix): set PURELANG_HAVE_CURL=1 when building runtime
+        if std::env::var("PURELANG_HAVE_CURL").ok().as_deref() == Some("1") {
+            cmd.arg("-DPURELANG_HAVE_CURL");
+            cmd.arg("-lcurl");
+        }
         cmd.arg("-lpthread");
     }
     // Explicit target when cross-compiling or for consistency

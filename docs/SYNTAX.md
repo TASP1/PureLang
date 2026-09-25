@@ -439,3 +439,16 @@ fn main() {
     sleep_ms(50)
 }
 ```
+
+
+### Native UI
+
+```pure
+fn main() {
+    print ui_native_available()
+    ui_alert("Title", "Message")
+    ui_begin("App", 400, 300)
+    ui_label("Hello")
+    ui_end()
+}
+```

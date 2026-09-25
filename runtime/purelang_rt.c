@@ -9,6 +9,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <wininet.h>
 #ifndef strdup
 #define strdup _strdup
 #endif
@@ -132,6 +133,38 @@ int64_t pl_ui_end(void) {
 
 
 /* ---- String helpers ---- */
+
+/* Native modal alert: Win32 MessageBox / macOS osascript / Linux zenity / HTML fallback */
+void pl_ui_alert(char *title, char *msg) {
+    const char *t = title ? title : "PureLang";
+    const char *m = msg ? msg : "";
+#if defined(_WIN32)
+    MessageBoxA(NULL, m, t, MB_OK | MB_ICONINFORMATION);
+#elif defined(__APPLE__)
+    {
+        char cmd[1024];
+        snprintf(cmd, sizeof(cmd),
+            "osascript -e 'display dialog \"%s\" with title \"%s\" buttons {\"OK\"} default button \"OK\"' 2>/dev/null",
+            m, t);
+        system(cmd);
+    }
+#else
+    {
+        char cmd[1024];
+        snprintf(cmd, sizeof(cmd),
+            "zenity --info --title='%s' --text='%s' 2>/dev/null || "
+            "notify-send '%s' '%s' 2>/dev/null || true",
+            t, m, t, m);
+        system(cmd);
+    }
+#endif
+    /* Always also append to HTML UI log if open */
+    if (ui_fp && ui_open) {
+        fprintf(ui_fp, "<div class=\"alert\"><strong>%s</strong>: %s</div>\n", t, m);
+    }
+}
+
+
 int64_t pl_str_contains(char *hay, char *needle) {
     if (!hay || !needle) return 0;
     return strstr(hay, needle) != NULL ? 1 : 0;
@@ -196,7 +229,41 @@ int64_t pl_time_ms(void) {
 
 #if defined(_WIN32)
 void pl_sleep_ms(int64_t ms) { if (ms > 0) Sleep((DWORD)ms); }
-char *pl_http_get(char *url) { (void)url; return (char *)calloc(1, 1); }
+/* In-process HTTPS/HTTP via WinInet (schannel under the hood) */
+static char *pl_http_get_wininet(char *url) {
+    char *empty = (char *)calloc(1, 1);
+    if (!url) return empty;
+    HINTERNET hNet = InternetOpenA("PureLang/0.31", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+    if (!hNet) return empty;
+    HINTERNET hUrl = InternetOpenUrlA(hNet, url, NULL, 0,
+        INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_SECURE, 0);
+    if (!hUrl) {
+        /* retry without SECURE flag for plain http */
+        hUrl = InternetOpenUrlA(hNet, url, NULL, 0,
+            INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
+    }
+    if (!hUrl) { InternetCloseHandle(hNet); return empty; }
+    size_t cap = 8192, len = 0;
+    char *buf = (char *)malloc(cap);
+    if (!buf) { InternetCloseHandle(hUrl); InternetCloseHandle(hNet); return empty; }
+    for (;;) {
+        DWORD n = 0;
+        if (len + 4096 + 1 > cap) {
+            cap *= 2;
+            char *nb = (char *)realloc(buf, cap);
+            if (!nb) break;
+            buf = nb;
+        }
+        if (!InternetReadFile(hUrl, buf + len, 4096, &n) || n == 0) break;
+        len += (size_t)n;
+    }
+    buf[len] = '\0';
+    InternetCloseHandle(hUrl);
+    InternetCloseHandle(hNet);
+    free(empty);
+    return buf;
+}
+char *pl_http_get(char *url) { return pl_http_get_wininet(url); }
 
 #define PL_CHAN_CAP 64
 typedef struct {
@@ -298,7 +365,7 @@ void pl_thread_spawn(void *fn) {
         ((PLFn0)fn)();
 }
 
-int64_t pl_ui_native_available(void) { return 0; }
+int64_t pl_ui_native_available(void) { return 1; }
 #else
 
 void pl_sleep_ms(int64_t ms) {
@@ -309,7 +376,43 @@ void pl_sleep_ms(int64_t ms) {
     while (nanosleep(&ts, &ts) != 0 && errno == EINTR) {}
 }
 
+#if defined(PURELANG_HAVE_CURL)
+#include <curl/curl.h>
+static size_t pl_curl_write(void *ptr, size_t size, size_t nmemb, void *userdata) {
+    size_t n = size * nmemb;
+    char **pbuf = (char **)userdata;
+    size_t old = *pbuf ? strlen(*pbuf) : 0;
+    char *nb = (char *)realloc(*pbuf, old + n + 1);
+    if (!nb) return 0;
+    memcpy(nb + old, ptr, n);
+    nb[old + n] = '\0';
+    *pbuf = nb;
+    return n;
+}
+static char *pl_http_get_libcurl(const char *url) {
+    CURL *c = curl_easy_init();
+    if (!c) return (char *)calloc(1, 1);
+    char *buf = (char *)calloc(1, 1);
+    curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, pl_curl_write);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &buf);
+    curl_easy_setopt(c, CURLOPT_USERAGENT, "PureLang/0.31");
+    if (curl_easy_perform(c) != CURLE_OK) {
+        free(buf);
+        buf = (char *)calloc(1, 1);
+    }
+    curl_easy_cleanup(c);
+    return buf;
+}
+#endif
+
 static char *pl_http_get_curl(const char *url) {
+#if defined(PURELANG_HAVE_CURL)
+    return pl_http_get_libcurl(url);
+#endif
+
     char cmd[2048];
     snprintf(cmd, sizeof(cmd), "curl -fsSL --max-time 30 '%s' 2>/dev/null", url);
     FILE *fp = popen(cmd, "r");
@@ -514,5 +617,5 @@ void pl_thread_spawn(void *fn) {
         ((PLFn0)fn)(); /* fallback: run on caller thread */
 }
 
-int64_t pl_ui_native_available(void) { return 0; }
+int64_t pl_ui_native_available(void) { return 1; }
 #endif

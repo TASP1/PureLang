@@ -1,0 +1,12 @@
+// Native UI backend probe + HTML still available
+
+fn main() {
+    print ui_native_available()
+    ui_begin("PureLang", 400, 200)
+    ui_label("Hello from PureLang")
+    ui_button("OK")
+    // Non-blocking in headless CI: alert may no-op without display
+    ui_alert("PureLang", "Native UI path ready")
+    ui_end()
+    print 1
+}

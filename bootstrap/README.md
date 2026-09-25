@@ -1,17 +1,19 @@
-# PureLang self-hosting bootstrap
+# PureLang self-host bootstrap
 
-Full self-hosting (purec written in PureLang) is a long-term goal.
+The production compiler (`purec`) is still implemented in **Rust**.
 
-This directory holds **bootstrap** programs that exercise language features needed for a future purec-in-PureLang:
+These programs grow a PureLang-written front end:
 
 | File | Role |
 |------|------|
-| `token_scan.pure` | Scan a hard-coded source string and classify characters |
+| `token_scan.pure` | Character class counts |
+| `lexer.pure` | Ident / number / punct tokenizer over a sample source |
 
 Build:
 
 ```bash
 cd compiler && cargo build --release
-./target/release/purec --compile -o token_scan ../bootstrap/token_scan.pure
-./token_scan
+./target/release/purec --compile -o /tmp/lexer ../bootstrap/lexer.pure && /tmp/lexer
 ```
+
+Next steps toward self-hosting: full token stream printer, recursive-descent parser for expr/stmt, then emit a subset of LLVM IR from PureLang.
