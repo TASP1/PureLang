@@ -4,7 +4,15 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#ifndef strdup
+#define strdup _strdup
+#endif
+#else
 #include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -177,13 +185,16 @@ char *pl_str_slice(char *s, int64_t start, int64_t end) {
 }
 
 int64_t pl_time_ms(void) {
+#if defined(_WIN32)
+    return (int64_t)GetTickCount64();
+#else
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
     return (int64_t)ts.tv_sec * 1000 + (int64_t)ts.tv_nsec / 1000000;
+#endif
 }
 
 #if defined(_WIN32)
-#include <windows.h>
 void pl_sleep_ms(int64_t ms) { if (ms > 0) Sleep((DWORD)ms); }
 char *pl_http_get(char *url) { (void)url; return (char *)calloc(1, 1); }
 void *pl_chan_new(void) { return calloc(1, 8); }
