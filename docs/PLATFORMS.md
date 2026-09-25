@@ -127,3 +127,8 @@ export ANDROID_NDK=/path/to/ndk
 # iOS (macOS + Xcode) → .o
 ./scripts/ios_build.sh examples/hello.pure hello.o
 ```
+
+
+### Windows runtime (v0.30+)
+
+Channels and `thread_spawn` use Win32 `CreateThread`, `CRITICAL_SECTION`, and `CONDITION_VARIABLE`. HTTPS `http_get` remains a stub on Windows (use curl-backed path on Unix).

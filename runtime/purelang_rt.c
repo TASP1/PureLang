@@ -197,20 +197,107 @@ int64_t pl_time_ms(void) {
 #if defined(_WIN32)
 void pl_sleep_ms(int64_t ms) { if (ms > 0) Sleep((DWORD)ms); }
 char *pl_http_get(char *url) { (void)url; return (char *)calloc(1, 1); }
-void *pl_chan_new(void) { return calloc(1, 8); }
-void pl_chan_send(void *ch, int64_t v) { (void)ch; (void)v; }
-int64_t pl_chan_recv(void *ch) { (void)ch; return 0; }
-int64_t pl_chan_len(void *ch) { (void)ch; return 0; }
-void pl_thread_spawn_send(void *ch, int64_t delay_ms, int64_t value) {
-    (void)ch; (void)delay_ms; (void)value;
+
+#define PL_CHAN_CAP 64
+typedef struct {
+    CRITICAL_SECTION mu;
+    CONDITION_VARIABLE cv_not_full;
+    CONDITION_VARIABLE cv_not_empty;
+    int64_t q[PL_CHAN_CAP];
+    int head, tail, count;
+} PLChanWin;
+
+typedef struct {
+    PLChanWin *ch;
+    int64_t delay_ms;
+    int64_t value;
+} PLThreadSendArgsWin;
+
+typedef int64_t (*PLFn0)(void);
+
+void *pl_chan_new(void) {
+    PLChanWin *c = (PLChanWin *)calloc(1, sizeof(PLChanWin));
+    if (!c) return NULL;
+    InitializeCriticalSection(&c->mu);
+    InitializeConditionVariable(&c->cv_not_full);
+    InitializeConditionVariable(&c->cv_not_empty);
+    return c;
 }
-void pl_thread_spawn(void *fn) {
-    (void)fn; /* Windows: stub — call inline for determinism in demos */
-    if (fn) {
-        typedef int64_t (*PLFn0)(void);
-        ((PLFn0)fn)();
+
+void pl_chan_send(void *ch, int64_t v) {
+    PLChanWin *c = (PLChanWin *)ch;
+    if (!c) return;
+    EnterCriticalSection(&c->mu);
+    while (c->count == PL_CHAN_CAP)
+        SleepConditionVariableCS(&c->cv_not_full, &c->mu, INFINITE);
+    c->q[c->tail] = v;
+    c->tail = (c->tail + 1) % PL_CHAN_CAP;
+    c->count++;
+    WakeConditionVariable(&c->cv_not_empty);
+    LeaveCriticalSection(&c->mu);
+}
+
+int64_t pl_chan_recv(void *ch) {
+    PLChanWin *c = (PLChanWin *)ch;
+    if (!c) return 0;
+    EnterCriticalSection(&c->mu);
+    while (c->count == 0)
+        SleepConditionVariableCS(&c->cv_not_empty, &c->mu, INFINITE);
+    int64_t v = c->q[c->head];
+    c->head = (c->head + 1) % PL_CHAN_CAP;
+    c->count--;
+    WakeConditionVariable(&c->cv_not_full);
+    LeaveCriticalSection(&c->mu);
+    return v;
+}
+
+int64_t pl_chan_len(void *ch) {
+    PLChanWin *c = (PLChanWin *)ch;
+    if (!c) return 0;
+    EnterCriticalSection(&c->mu);
+    int64_t n = c->count;
+    LeaveCriticalSection(&c->mu);
+    return n;
+}
+
+static DWORD WINAPI pl_thread_send_main_win(LPVOID arg) {
+    PLThreadSendArgsWin *a = (PLThreadSendArgsWin *)arg;
+    if (a->delay_ms > 0) pl_sleep_ms(a->delay_ms);
+    pl_chan_send(a->ch, a->value);
+    free(a);
+    return 0;
+}
+
+void pl_thread_spawn_send(void *ch, int64_t delay_ms, int64_t value) {
+    PLThreadSendArgsWin *a = (PLThreadSendArgsWin *)malloc(sizeof(PLThreadSendArgsWin));
+    if (!a) return;
+    a->ch = (PLChanWin *)ch;
+    a->delay_ms = delay_ms;
+    a->value = value;
+    HANDLE h = CreateThread(NULL, 0, pl_thread_send_main_win, a, 0, NULL);
+    if (h)
+        CloseHandle(h);
+    else {
+        pl_chan_send(a->ch, a->value);
+        free(a);
     }
 }
+
+static DWORD WINAPI pl_thread_fn_main_win(LPVOID arg) {
+    PLFn0 f = (PLFn0)arg;
+    if (f) f();
+    return 0;
+}
+
+void pl_thread_spawn(void *fn) {
+    if (!fn) return;
+    HANDLE h = CreateThread(NULL, 0, pl_thread_fn_main_win, fn, 0, NULL);
+    if (h)
+        CloseHandle(h);
+    else
+        ((PLFn0)fn)();
+}
+
 int64_t pl_ui_native_available(void) { return 0; }
 #else
 

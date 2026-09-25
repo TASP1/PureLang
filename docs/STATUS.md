@@ -1,10 +1,10 @@
-# PureLang completion status (v0.29.0)
+# PureLang completion status (v0.30.0)
 
 Honest snapshot of the five “complete all” tracks.
 
 | Track | MVP shipped | Production-complete? |
 |-------|-------------|----------------------|
-| **Threads / channels** | `channel_new/send/recv/len`, `thread_spawn_send` (pthread) | Partial — Unix pthread; Windows stubs (non-blocking); function values enable future spawn(fn) |
+| **Threads / channels** | `channel_new/send/recv/len`, `thread_spawn_send` (pthread) | Yes (MVP) — Unix pthread; Windows CreateThread + CRITICAL_SECTION/CONDITION_VARIABLE |
 | **HTTPS / TLS** | `https://` via system `curl`; `http://` via sockets | No — not in-process TLS (OpenSSL/rustls) |
 | **Native UI** | HTML export + `ui_native_available()==0` | No — no Win32/Cocoa/Android toolkits |
 | **iOS / Android sysroots** | `scripts/android_build.sh`, `ios_build.sh`, `--platform` | No — no CI device matrix or store packaging |
@@ -17,5 +17,5 @@ These foundations are **usable for demos and further development**. They are **n
 Next engineering priority: **`thread_spawn(fn)`** using function values; then Windows threads/channels; then self-host lexer growth.
 
 
-## v0.29.0
+## v0.30.0
 - str_char_at / str_slice — bootstrap lexer progress
