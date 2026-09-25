@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.32.0**
+**Compiler:** `purec` **v0.33.0**
 
 ## Quick Example
 
@@ -74,7 +74,7 @@ fn main() {
 - [x] Native UI backends (`ui_alert`, Win32 window+button, MessageBox, osascript/zenity, HTML)
 - [x] iOS / Android sysroot scripts + CI `--check`
 - [x] Self-host bootstrap lexer (`bootstrap/lexer.pure`)
-- [x] In-process HTTPS (WinInet on Windows; libcurl optional / curl CLI on Unix)
+- [x] In-process HTTPS (**OpenSSL** Unix / **WinInet** Windows) (WinInet on Windows; libcurl optional / curl CLI on Unix)
 - [x] Windows: real channels/threads (`CreateThread` + condition variables)
 
 ## Try it
@@ -106,7 +106,7 @@ cargo run --release -- pkg init myapp
 
 ```
 PureLang/
-├── compiler/           # purec v0.32.0 (Rust)
+├── compiler/           # purec v0.33.0 (Rust)
 │   └── src/            # lexer → parser → checker → codegen / wasm / lsp / pkg
 ├── runtime/            # purelang_rt.c (maps, UI, time_ms, strings)
 ├── docs/               # architecture, syntax, platforms, UI, package, …

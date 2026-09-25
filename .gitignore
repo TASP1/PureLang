@@ -3,3 +3,4 @@ purelang_ui.html
 /tmp/
 *.ll
 purelang_test*.txt
+bootstrap_out.ll

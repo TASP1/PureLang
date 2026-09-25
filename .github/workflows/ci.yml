@@ -78,6 +78,36 @@ jobs:
           bash scripts/ios_build.sh --check
           xcrun -sdk iphoneos --show-sdk-path
 
+  package:
+    name: Device packaging artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang libssl-dev
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build purec
+        working-directory: compiler
+        run: cargo build --release
+      - name: Android packaging skeleton
+        run: |
+          bash scripts/android_build.sh --check
+          mkdir -p dist/android
+          echo "PureLang Android packaging stub" > dist/android/README.txt
+          echo "Use scripts/android_build.sh with ANDROID_NDK_HOME to produce libpureapp.so" >> dist/android/README.txt
+      - name: Desktop package
+        run: |
+          mkdir -p dist/linux
+          compiler/target/release/purec --compile -o dist/linux/hello examples/hello.pure
+          cp compiler/target/release/purec dist/linux/
+          tar -czf dist/purelang-linux-x64.tar.gz -C dist linux
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: purelang-packages
+          path: dist/
+
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -98,7 +128,7 @@ jobs:
 
       - name: Install clang (Ubuntu)
         if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang libcurl4-openssl-dev
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang libssl-dev
 
       - name: Install LLVM/clang (Windows)
         if: runner.os == 'Windows'

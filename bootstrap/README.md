@@ -1,16 +1,16 @@
 # PureLang self-host bootstrap
 
-Production compiler (`purec`) is still **Rust**. These programs implement a growing PureLang front/middle end:
-
-| Stage | File | Status |
+| Stage | File | Output |
 |-------|------|--------|
-| Char scan | `token_scan.pure` | done |
-| Lexer | `lexer.pure` | done |
-| Parser + codegen (subset) | `parser_codegen.pure` | parses `print <int>`, reports IR template size |
+| Char scan | `token_scan.pure` | counts |
+| Lexer | `lexer.pure` | token class counts |
+| Parser subset | `parser_codegen.pure` | parse `print N` |
+| **Mini compiler** | `purec_mini.pure` | writes `bootstrap_out.ll` |
 
 ```bash
 cd compiler && cargo build --release
-./target/release/purec --compile -o /tmp/pc ../bootstrap/parser_codegen.pure && /tmp/pc
+./target/release/purec --compile -o /tmp/mini ../bootstrap/purec_mini.pure && /tmp/mini
+# optional: clang bootstrap_out.ll -o /tmp/out && /tmp/out
 ```
 
-Roadmap to full self-host: token list → recursive descent for expr/stmt → emit `.ll` via `write_file` → invoke `clang`.
+Production `purec` remains Rust until the PureLang pipeline covers modules, types, and full LLVM emission.

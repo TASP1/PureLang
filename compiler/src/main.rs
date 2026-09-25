@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.32.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.33.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
@@ -295,18 +295,22 @@ fn main() {
             cmd.arg("-lwininet");
         }
         // Optional in-process libcurl (Unix): set PURELANG_HAVE_CURL=1 when building runtime
-        // Default in-process TLS/HTTPS on Unix via libcurl when headers exist
+        // Mandatory in-process TLS: OpenSSL on Unix, WinInet on Windows
         if !triple.contains("windows") {
-            let curl_hdr = [
-                "/usr/include/curl/curl.h",
-                "/usr/local/include/curl/curl.h",
-                "/opt/homebrew/include/curl/curl.h",
+            let ssl_hdr = [
+                "/usr/include/openssl/ssl.h",
+                "/usr/local/include/openssl/ssl.h",
+                "/opt/homebrew/include/openssl/ssl.h",
             ]
             .iter()
             .any(|p| std::path::Path::new(p).exists());
-            if curl_hdr {
-                cmd.arg("-DPURELANG_HAVE_CURL");
-                cmd.arg("-lcurl");
+            if ssl_hdr {
+                cmd.arg("-lssl");
+                cmd.arg("-lcrypto");
+            } else {
+                eprintln!(
+                    "warning: OpenSSL headers not found — HTTPS requires libssl-dev / openssl"
+                );
             }
         }
         cmd.arg("-lpthread");

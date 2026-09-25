@@ -1392,6 +1392,20 @@ impl Codegen {
                         let _ = writeln!(self.body, "  call void @{}(ptr {})", fn_name, s);
                         return ("1".into(), VarKind::Number);
                     }
+                    if builtin == "ui_add_button" {
+                        let (a, _) = self.emit_expr(&args[0]);
+                        let _ = writeln!(self.body, "  call void @pl_ui_add_button(ptr {})", a);
+                        return ("0".into(), VarKind::Number);
+                    }
+                    if builtin == "ui_add_edit" {
+                        let (a, _) = self.emit_expr(&args[0]);
+                        let _ = writeln!(self.body, "  call void @pl_ui_add_edit(ptr {})", a);
+                        return ("0".into(), VarKind::Number);
+                    }
+                    if builtin == "ui_add_listbox" {
+                        let _ = writeln!(self.body, "  call void @pl_ui_add_listbox()");
+                        return ("0".into(), VarKind::Number);
+                    }
                     if builtin == "ui_window_show" {
                         let (a, _) = self.emit_expr(&args[0]);
                         let (b, _) = self.emit_expr(&args[1]);

@@ -169,6 +169,7 @@ void pl_ui_alert(char *title, char *msg) {
 
 #if defined(_WIN32)
 static HWND pl_hwnd = NULL;
+static HWND pl_last_hwnd = NULL;
 static char pl_ui_title[256] = "PureLang";
 static char pl_ui_body[2048] = "";
 
@@ -216,6 +217,7 @@ int64_t pl_ui_window_show(char *title, char *body) {
         CW_USEDEFAULT, CW_USEDEFAULT, 420, 240,
         NULL, NULL, hi, NULL);
     if (!hwnd) return 0;
+    pl_last_hwnd = hwnd;
     CreateWindowExA(0, "STATIC", pl_ui_body,
         WS_CHILD | WS_VISIBLE, 12, 12, 380, 120,
         hwnd, NULL, hi, NULL);
@@ -242,6 +244,40 @@ int64_t pl_ui_window_show(char *title, char *body) {
 }
 #endif
 
+
+
+#if defined(_WIN32)
+/* Additional Win32 widgets attached to last shown parent or create child controls API */
+static HWND pl_last_hwnd = NULL;
+
+void pl_ui_add_button(char *label) {
+    if (!pl_last_hwnd || !label) return;
+    CreateWindowExA(0, "BUTTON", label, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+        20, 180, 100, 28, pl_last_hwnd, (HMENU)2, GetModuleHandleA(NULL), NULL);
+}
+void pl_ui_add_edit(char *placeholder) {
+    if (!pl_last_hwnd) return;
+    CreateWindowExA(WS_EX_CLIENTEDGE, "EDIT", placeholder ? placeholder : "",
+        WS_CHILD | WS_VISIBLE | ES_LEFT | ES_AUTOHSCROLL,
+        12, 140, 380, 24, pl_last_hwnd, (HMENU)3, GetModuleHandleA(NULL), NULL);
+}
+void pl_ui_add_listbox(void) {
+    if (!pl_last_hwnd) return;
+    CreateWindowExA(WS_EX_CLIENTEDGE, "LISTBOX", "",
+        WS_CHILD | WS_VISIBLE | LBS_NOTIFY | WS_VSCROLL,
+        12, 40, 180, 90, pl_last_hwnd, (HMENU)4, GetModuleHandleA(NULL), NULL);
+}
+#else
+void pl_ui_add_button(char *label) { pl_ui_button(label); }
+void pl_ui_add_edit(char *placeholder) {
+    if (ui_fp && ui_open)
+        fprintf(ui_fp, "<input type=\"text\" placeholder=\"%s\"/>\n", placeholder ? placeholder : "");
+}
+void pl_ui_add_listbox(void) {
+    if (ui_fp && ui_open)
+        fprintf(ui_fp, "<select><option>Item</option></select>\n");
+}
+#endif
 
 int64_t pl_str_contains(char *hay, char *needle) {
     if (!hay || !needle) return 0;
@@ -486,6 +522,100 @@ static char *pl_http_get_libcurl(const char *url) {
 }
 #endif
 
+
+#if !defined(_WIN32)
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
+static char *pl_http_get_openssl(const char *url) {
+    char *empty = (char *)calloc(1, 1);
+    if (!url || strncmp(url, "https://", 8) != 0) return empty;
+    const char *p = url + 8;
+    char host[256], path[1024];
+    int port = 443;
+    const char *slash = strchr(p, '/');
+    const char *colon = strchr(p, ':');
+    size_t host_len;
+    if (colon && (!slash || colon < slash)) {
+        host_len = (size_t)(colon - p);
+        if (host_len >= sizeof(host)) host_len = sizeof(host) - 1;
+        memcpy(host, p, host_len); host[host_len] = '\0';
+        port = atoi(colon + 1);
+        if (slash) { strncpy(path, slash, sizeof(path)-1); path[sizeof(path)-1]='\0'; }
+        else strcpy(path, "/");
+    } else if (slash) {
+        host_len = (size_t)(slash - p);
+        if (host_len >= sizeof(host)) host_len = sizeof(host) - 1;
+        memcpy(host, p, host_len); host[host_len] = '\0';
+        strncpy(path, slash, sizeof(path)-1); path[sizeof(path)-1]='\0';
+    } else {
+        strncpy(host, p, sizeof(host)-1); host[sizeof(host)-1]='\0';
+        strcpy(path, "/");
+    }
+    struct addrinfo hints, *res = NULL;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    char port_s[16];
+    snprintf(port_s, sizeof(port_s), "%d", port);
+    if (getaddrinfo(host, port_s, &hints, &res) != 0 || !res) return empty;
+    int fd = -1;
+    for (struct addrinfo *ai = res; ai; ai = ai->ai_next) {
+        fd = (int)socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (fd < 0) continue;
+        if (connect(fd, ai->ai_addr, ai->ai_addrlen) == 0) break;
+        close(fd); fd = -1;
+    }
+    freeaddrinfo(res);
+    if (fd < 0) return empty;
+
+    SSL_library_init();
+    SSL_load_error_strings();
+    const SSL_METHOD *method = TLS_client_method();
+    SSL_CTX *ctx = SSL_CTX_new(method);
+    if (!ctx) { close(fd); return empty; }
+    SSL *ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, fd);
+    SSL_set_tlsext_host_name(ssl, host);
+    if (SSL_connect(ssl) != 1) {
+        SSL_free(ssl); SSL_CTX_free(ctx); close(fd); return empty;
+    }
+    char req[2048];
+    snprintf(req, sizeof(req),
+        "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: PureLang/0.33\r\nConnection: close\r\n\r\n",
+        path, host);
+    SSL_write(ssl, req, (int)strlen(req));
+    size_t cap = 8192, len = 0;
+    char *buf = (char *)malloc(cap);
+    if (!buf) { SSL_shutdown(ssl); SSL_free(ssl); SSL_CTX_free(ctx); close(fd); return empty; }
+    for (;;) {
+        if (len + 4096 + 1 > cap) {
+            cap *= 2;
+            char *nb = (char *)realloc(buf, cap);
+            if (!nb) break;
+            buf = nb;
+        }
+        int n = SSL_read(ssl, buf + len, 4096);
+        if (n <= 0) break;
+        len += (size_t)n;
+    }
+    buf[len] = '\0';
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+    SSL_CTX_free(ctx);
+    close(fd);
+    char *body = strstr(buf, "\r\n\r\n");
+    if (body) {
+        body += 4;
+        size_t blen = strlen(body);
+        char *out = (char *)malloc(blen + 1);
+        if (out) { memcpy(out, body, blen + 1); free(buf); free(empty); return out; }
+    }
+    free(empty);
+    return buf;
+}
+#endif
+
 static char *pl_http_get_curl(const char *url) {
 #if defined(PURELANG_HAVE_CURL) || (defined(__has_include) && __has_include(<curl/curl.h>))
     return pl_http_get_libcurl(url);
@@ -520,7 +650,11 @@ char *pl_http_get(char *url) {
     if (!url) return empty;
     if (strncmp(url, "https://", 8) == 0) {
         free(empty);
+#if !defined(_WIN32)
+        return pl_http_get_openssl(url);
+#else
         return pl_http_get_curl(url);
+#endif
     }
     if (strncmp(url, "http://", 7) != 0) return empty;
 

@@ -1,0 +1,39 @@
+// PureLang-written mini compiler: parse print N, write simple IR file
+
+fn main() {
+    src = "print 42"
+    n = str_len(src)
+    mut ok = 0
+    if n >= 7 {
+        if str_char_at(src, 0) == 112 {
+            if str_char_at(src, 5) == 32 {
+                ok = 1
+            }
+        }
+    }
+    mut val = 0
+    mut i = 6
+    while i < n {
+        mut c = str_char_at(src, i)
+        if c >= 48 {
+            if c <= 57 {
+                val = val * 10 + (c - 48)
+                i = i + 1
+            } else {
+                break
+            }
+        } else {
+            break
+        }
+    }
+    mut ir = "; purec_mini\n"
+    ir = str_concat(ir, "declare i32 @printf(ptr, ...)\n")
+    ir = str_concat(ir, "define i32 @main() {\n")
+    ir = str_concat(ir, "  ; value=")
+    ir = str_concat(ir, str_from_num(val))
+    ir = str_concat(ir, "\n  ret i32 0\n}\n")
+    write_file("bootstrap_out.ll", ir)
+    print ok
+    print val
+    print 1
+}
