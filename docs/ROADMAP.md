@@ -79,6 +79,7 @@
 
 ## Phase 5 — Ecosystem & Production
 
+- [ ] `thread_spawn(fn)` with function values
 - Self-hosting compiler
 - Comprehensive test suite + fuzzer
 - Debugger support

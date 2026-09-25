@@ -14,7 +14,7 @@ Honest snapshot of the five “complete all” tracks.
 
 These foundations are **usable for demos and further development**. They are **not** substitutes for mature runtimes (Tokio, NSURLSession, SwiftUI, full purec-in-PureLang).
 
-Next engineering priority: deepen one track at a time (likely channels → real `spawn(fn)` once function values exist).
+Next engineering priority: **`thread_spawn(fn)`** using function values; then Windows threads/channels; then self-host lexer growth.
 
 
 ## v0.28.1

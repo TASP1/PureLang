@@ -69,11 +69,11 @@ fn main() {
 - [x] Golden output tests (`tests/run.sh`)
 
 ### Next
-- [x] Networking (`sleep_ms`, `http_get` + HTTPS via curl)
-- [x] Threads / channels (`channel_new/send/recv/len`, `thread_spawn_send`)
+- [ ] `thread_spawn(fn)` — spawn a zero-arg function value on a thread
 - [ ] Native UI backends (beyond HTML export)
-- [ ] iOS / Android sysroot automation
-- [ ] Self-hosting compiler
+- [ ] iOS / Android sysroot automation in CI
+- [ ] Self-hosting compiler (beyond bootstrap seeds)
+- [ ] Windows: real channels/threads (not stubs)
 
 ## Try it
 
@@ -86,6 +86,10 @@ cargo build --release
 
 cargo run --release -- ../examples/hello.pure
 cargo run --release -- --compile -o hello ../examples/hello.pure && ./hello
+
+# Function values, channels, floats
+cargo run --release -- --compile -o /tmp/fn ../examples/fn_values.pure && /tmp/fn
+cargo run --release -- --compile -o /tmp/ch ../examples/channels.pure && /tmp/ch
 
 # Formatter / LSP / packages
 cargo run --release -- --fmt ../examples/hello.pure
