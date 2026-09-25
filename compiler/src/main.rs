@@ -33,7 +33,7 @@ fn main() {
     }
 
     if args[1] == "--version" || args[1] == "-V" {
-        println!("purec 0.31.0 (PureLang — multi-platform, LSP, package manager)");
+        println!("purec 0.32.0 (PureLang — multi-platform, LSP, package manager)");
         return;
     }
 
@@ -295,9 +295,19 @@ fn main() {
             cmd.arg("-lwininet");
         }
         // Optional in-process libcurl (Unix): set PURELANG_HAVE_CURL=1 when building runtime
-        if std::env::var("PURELANG_HAVE_CURL").ok().as_deref() == Some("1") {
-            cmd.arg("-DPURELANG_HAVE_CURL");
-            cmd.arg("-lcurl");
+        // Default in-process TLS/HTTPS on Unix via libcurl when headers exist
+        if !triple.contains("windows") {
+            let curl_hdr = [
+                "/usr/include/curl/curl.h",
+                "/usr/local/include/curl/curl.h",
+                "/opt/homebrew/include/curl/curl.h",
+            ]
+            .iter()
+            .any(|p| std::path::Path::new(p).exists());
+            if curl_hdr {
+                cmd.arg("-DPURELANG_HAVE_CURL");
+                cmd.arg("-lcurl");
+            }
         }
         cmd.arg("-lpthread");
     }

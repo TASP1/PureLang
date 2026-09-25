@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.31.0**
+**Compiler:** `purec` **v0.32.0**
 
 ## Quick Example
 
@@ -58,6 +58,7 @@ fn main() {
 - [x] Lists (`list_len` / `list_get` / `list_sum` / `list_max` / `list_min`)
 - [x] Strings (`str_len`, `str_char_at`, `str_slice`, `str_is_empty`, `str_contains`, `str_eq`, `str_concat`, `str_from_num`)
 - [x] Maps (`map_new` / `map_set` / `map_get` / `map_has` / `map_len`)
+- [x] HTML UI foundation + **`ui_window_show`** (Win32 HWND widgets)
 - [x] HTML UI foundation (`ui_begin` … → `purelang_ui.html`)
 
 ### Tooling & platforms
@@ -70,7 +71,7 @@ fn main() {
 
 ### Next
 - [x] `thread_spawn(fn)` — spawn a zero-arg function value on a thread
-- [x] Native UI backends (`ui_alert`, MessageBox/osascript/zenity + HTML)
+- [x] Native UI backends (`ui_alert`, Win32 window+button, MessageBox, osascript/zenity, HTML)
 - [x] iOS / Android sysroot scripts + CI `--check`
 - [x] Self-host bootstrap lexer (`bootstrap/lexer.pure`)
 - [x] In-process HTTPS (WinInet on Windows; libcurl optional / curl CLI on Unix)
@@ -105,7 +106,7 @@ cargo run --release -- pkg init myapp
 
 ```
 PureLang/
-├── compiler/           # purec v0.31.0 (Rust)
+├── compiler/           # purec v0.32.0 (Rust)
 │   └── src/            # lexer → parser → checker → codegen / wasm / lsp / pkg
 ├── runtime/            # purelang_rt.c (maps, UI, time_ms, strings)
 ├── docs/               # architecture, syntax, platforms, UI, package, …

@@ -173,6 +173,8 @@ impl TypeChecker {
             ("ui_label", vec![String], Number),
             ("ui_end", vec![], Number),
             ("ui_alert", vec![String, String], Number),
+            ("ui_window_show", vec![String, String], Number),
+            ("std_ui_window_show", vec![String, String], Number),
             ("std_ui_alert", vec![String, String], Number),
             ("std_ui_begin", vec![String, Number, Number], Number),
             ("std_ui_text", vec![String], Number),

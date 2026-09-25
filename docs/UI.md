@@ -34,3 +34,8 @@ purec --compile -o ui_demo examples/ui_demo.pure
 `ui_native_available()` returns `0` until OS toolkits (Win32 / Cocoa / Android View) are wired.
 
 Today the default backend remains **HTML export** (`ui_begin` … `ui_end` → `purelang_ui.html`).
+
+
+## ui_window_show (v0.32+)
+
+Win32: real HWND with static text and OK button. Other platforms: HTML export via ui_begin/end.

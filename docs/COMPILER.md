@@ -74,3 +74,6 @@ Native builds invoke `clang` with optimization flags, host/target triple, `-lm` 
 - Column-level diagnostics
 - Stronger incremental compilation
 - Self-hosting
+
+
+_Version alignment: purec **v0.32.0** (Win32 widgets, default libcurl when headers present, bootstrap parser_codegen)._

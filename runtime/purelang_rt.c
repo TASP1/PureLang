@@ -165,6 +165,84 @@ void pl_ui_alert(char *title, char *msg) {
 }
 
 
+
+
+#if defined(_WIN32)
+static HWND pl_hwnd = NULL;
+static char pl_ui_title[256] = "PureLang";
+static char pl_ui_body[2048] = "";
+
+static LRESULT CALLBACK pl_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_COMMAND:
+        if (LOWORD(wParam) == 1) {
+            MessageBoxA(hwnd, "Button clicked", pl_ui_title, MB_OK);
+        }
+        break;
+    case WM_CLOSE:
+        DestroyWindow(hwnd);
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProcA(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+/* Show a real Win32 window with label + button (message loop until closed). */
+int64_t pl_ui_window_show(char *title, char *body) {
+    if (title) {
+        strncpy(pl_ui_title, title, sizeof(pl_ui_title) - 1);
+        pl_ui_title[sizeof(pl_ui_title) - 1] = '\0';
+    }
+    if (body) {
+        strncpy(pl_ui_body, body, sizeof(pl_ui_body) - 1);
+        pl_ui_body[sizeof(pl_ui_body) - 1] = '\0';
+    }
+    HINSTANCE hi = GetModuleHandleA(NULL);
+    WNDCLASSA wc;
+    memset(&wc, 0, sizeof(wc));
+    wc.lpfnWndProc = pl_wnd_proc;
+    wc.hInstance = hi;
+    wc.lpszClassName = "PureLangWin";
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    RegisterClassA(&wc);
+    HWND hwnd = CreateWindowExA(
+        0, "PureLangWin", pl_ui_title,
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        CW_USEDEFAULT, CW_USEDEFAULT, 420, 240,
+        NULL, NULL, hi, NULL);
+    if (!hwnd) return 0;
+    CreateWindowExA(0, "STATIC", pl_ui_body,
+        WS_CHILD | WS_VISIBLE, 12, 12, 380, 120,
+        hwnd, NULL, hi, NULL);
+    CreateWindowExA(0, "BUTTON", "OK",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 160, 150, 80, 28,
+        hwnd, (HMENU)1, hi, NULL);
+    ShowWindow(hwnd, SW_SHOW);
+    UpdateWindow(hwnd);
+    MSG msg;
+    while (GetMessageA(&msg, NULL, 0, 0) > 0) {
+        TranslateMessage(&msg);
+        DispatchMessageA(&msg);
+    }
+    return 1;
+}
+#else
+/* Non-Windows: open HTML UI file or print body */
+int64_t pl_ui_window_show(char *title, char *body) {
+    pl_ui_begin(title ? title : "PureLang", 420, 240);
+    pl_ui_label(body ? body : "");
+    pl_ui_button("OK");
+    pl_ui_end();
+    return 1;
+}
+#endif
+
+
 int64_t pl_str_contains(char *hay, char *needle) {
     if (!hay || !needle) return 0;
     return strstr(hay, needle) != NULL ? 1 : 0;
@@ -376,7 +454,7 @@ void pl_sleep_ms(int64_t ms) {
     while (nanosleep(&ts, &ts) != 0 && errno == EINTR) {}
 }
 
-#if defined(PURELANG_HAVE_CURL)
+#if defined(PURELANG_HAVE_CURL) || (defined(__has_include) && __has_include(<curl/curl.h>))
 #include <curl/curl.h>
 static size_t pl_curl_write(void *ptr, size_t size, size_t nmemb, void *userdata) {
     size_t n = size * nmemb;
@@ -409,9 +487,9 @@ static char *pl_http_get_libcurl(const char *url) {
 #endif
 
 static char *pl_http_get_curl(const char *url) {
-#if defined(PURELANG_HAVE_CURL)
+#if defined(PURELANG_HAVE_CURL) || (defined(__has_include) && __has_include(<curl/curl.h>))
     return pl_http_get_libcurl(url);
-#endif
+#else
 
     char cmd[2048];
     snprintf(cmd, sizeof(cmd), "curl -fsSL --max-time 30 '%s' 2>/dev/null", url);
@@ -434,6 +512,7 @@ static char *pl_http_get_curl(const char *url) {
     pclose(fp);
     buf[len] = '\0';
     return buf;
+#endif
 }
 
 char *pl_http_get(char *url) {

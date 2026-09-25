@@ -1392,6 +1392,17 @@ impl Codegen {
                         let _ = writeln!(self.body, "  call void @{}(ptr {})", fn_name, s);
                         return ("1".into(), VarKind::Number);
                     }
+                    if builtin == "ui_window_show" {
+                        let (a, _) = self.emit_expr(&args[0]);
+                        let (b, _) = self.emit_expr(&args[1]);
+                        let res = self.fresh();
+                        let _ = writeln!(
+                            self.body,
+                            "  {} = call i64 @pl_ui_window_show(ptr {}, ptr {})",
+                            res, a, b
+                        );
+                        return (res, VarKind::Number);
+                    }
                     if builtin == "ui_alert" {
                         let (a, _) = self.emit_expr(&args[0]);
                         let (b, _) = self.emit_expr(&args[1]);
