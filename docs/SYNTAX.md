@@ -452,3 +452,15 @@ fn main() {
     ui_end()
 }
 ```
+
+
+### String escapes
+
+```pure
+fn main() {
+    s = "line1\nline2"
+    print str_len(s)
+}
+```
+
+Supported: `\n` `\t` `\r` `\\` `\"`.

@@ -574,6 +574,9 @@ static char *pl_http_get_openssl(const char *url) {
     const SSL_METHOD *method = TLS_client_method();
     SSL_CTX *ctx = SSL_CTX_new(method);
     if (!ctx) { close(fd); return empty; }
+    SSL_CTX_set_default_verify_paths(ctx);
+    /* VERIFY_PEER once CA bundle is guaranteed; NONE keeps demos usable */
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
     SSL *ssl = SSL_new(ctx);
     SSL_set_fd(ssl, fd);
     SSL_set_tlsext_host_name(ssl, host);

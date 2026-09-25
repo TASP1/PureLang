@@ -1117,7 +1117,8 @@ impl TypeChecker {
             "map_get" | "map_has" | "map_len" => true,
             "map_set" => arg_index == 0 || arg_index == 1, // map + key borrowed; value is Number
             "map_new" => false,
-            "read_file" | "file_exists" | "write_file" => arg_index == 0,
+            "read_file" | "file_exists" => arg_index == 0,
+            "write_file" => true, // path + contents both borrowed
             "print" => true,
             _ => false,
         }

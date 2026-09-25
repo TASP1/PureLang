@@ -77,8 +77,39 @@ impl Lexer {
                 self.advance(); // skip closing "
                 break;
             }
-            result.push(ch);
-            self.advance();
+            if ch == '\\' {
+                self.advance();
+                match self.peek() {
+                    Some('n') => {
+                        self.advance();
+                        result.push('\n');
+                    }
+                    Some('t') => {
+                        self.advance();
+                        result.push('\t');
+                    }
+                    Some('r') => {
+                        self.advance();
+                        result.push('\r');
+                    }
+                    Some('\\') => {
+                        self.advance();
+                        result.push('\\');
+                    }
+                    Some('"') => {
+                        self.advance();
+                        result.push('"');
+                    }
+                    Some(other) => {
+                        self.advance();
+                        result.push(other);
+                    }
+                    None => break,
+                }
+            } else {
+                result.push(ch);
+                self.advance();
+            }
         }
         Token::String(result)
     }

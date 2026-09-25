@@ -1,4 +1,4 @@
-// PureLang-written mini compiler: parse print N, write simple IR file
+// PureLang mini-compiler: parse `print <int>`, emit real LLVM IR, write file
 
 fn main() {
     src = "print 42"
@@ -26,14 +26,21 @@ fn main() {
             break
         }
     }
-    mut ir = "; purec_mini\n"
+
+    mut ir = "target triple = \"x86_64-unknown-linux-gnu\"\n"
     ir = str_concat(ir, "declare i32 @printf(ptr, ...)\n")
+    ir = str_concat(ir, "@.fmt = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n")
     ir = str_concat(ir, "define i32 @main() {\n")
-    ir = str_concat(ir, "  ; value=")
+    ir = str_concat(ir, "entry:\n")
+    ir = str_concat(ir, "  %f = getelementptr inbounds [6 x i8], ptr @.fmt, i64 0, i64 0\n")
+    ir = str_concat(ir, "  call i32 (ptr, ...) @printf(ptr %f, i64 ")
     ir = str_concat(ir, str_from_num(val))
-    ir = str_concat(ir, "\n  ret i32 0\n}\n")
+    ir = str_concat(ir, ")\n")
+    ir = str_concat(ir, "  ret i32 0\n")
+    ir = str_concat(ir, "}\n")
     write_file("bootstrap_out.ll", ir)
+
     print ok
     print val
-    print 1
+    print str_len(ir)
 }

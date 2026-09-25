@@ -1,0 +1,8 @@
+// In-process HTTPS via OpenSSL (Unix) / WinInet (Windows)
+
+fn main() {
+    // example.com is stable for a tiny GET
+    body = http_get("https://example.com/")
+    print str_len(body)
+    print str_contains(body, "Example")
+}
