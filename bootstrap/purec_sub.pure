@@ -1,0 +1,161 @@
+// PureLang subset compiler — x=40 / print x / print 99 → LLVM IR
+// Avoids passing strings into helpers (ownership MVP).
+
+fn main() {
+    src = "x = 40\ny = 2\nprint x\nprint y\nprint 99\n"
+    n = str_len(src)
+    env = map_new()
+    mut i = 0
+    mut assigns = 0
+    mut prints = 0
+    mut ir_body = ""
+
+    while i < n {
+        mut c = str_char_at(src, i)
+        while i < n {
+            c = str_char_at(src, i)
+            if c == 32 {
+                i = i + 1
+            } else {
+                if c == 10 {
+                    i = i + 1
+                } else {
+                    break
+                }
+            }
+        }
+        if i >= n {
+            break
+        }
+        c = str_char_at(src, i)
+
+        // print
+        if c == 112 {
+            if i + 5 <= n {
+                if str_char_at(src, i + 1) == 114 {
+                    if str_char_at(src, i + 2) == 105 {
+                        if str_char_at(src, i + 3) == 110 {
+                            if str_char_at(src, i + 4) == 116 {
+                                i = i + 5
+                                while i < n {
+                                    c = str_char_at(src, i)
+                                    if c == 32 {
+                                        i = i + 1
+                                    } else {
+                                        break
+                                    }
+                                }
+                                mut pval = 0
+                                c = str_char_at(src, i)
+                                if c >= 48 {
+                                    if c <= 57 {
+                                        while i < n {
+                                            c = str_char_at(src, i)
+                                            if c >= 48 {
+                                                if c <= 57 {
+                                                    pval = pval * 10 + (c - 48)
+                                                    i = i + 1
+                                                } else {
+                                                    break
+                                                }
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                    } else {
+                                        // variable: single letter key
+                                        if c >= 97 {
+                                            if c <= 122 {
+                                                mut key = str_slice(src, i, i + 1)
+                                                pval = map_get(env, key)
+                                                i = i + 1
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    if c >= 97 {
+                                        if c <= 122 {
+                                            mut key2 = str_slice(src, i, i + 1)
+                                            pval = map_get(env, key2)
+                                            i = i + 1
+                                        }
+                                    }
+                                }
+                                ir_body = str_concat(ir_body, "  call i32 (ptr, ...) @printf(ptr %f, i64 ")
+                                ir_body = str_concat(ir_body, str_from_num(pval))
+                                ir_body = str_concat(ir_body, ")\n")
+                                prints = prints + 1
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // assign letter = number
+            if c >= 97 {
+                if c <= 122 {
+                    mut key = str_slice(src, i, i + 1)
+                    i = i + 1
+                    while i < n {
+                        c = str_char_at(src, i)
+                        if c == 32 {
+                            i = i + 1
+                        } else {
+                            break
+                        }
+                    }
+                    if i < n {
+                        if str_char_at(src, i) == 61 {
+                            i = i + 1
+                            while i < n {
+                                c = str_char_at(src, i)
+                                if c == 32 {
+                                    i = i + 1
+                                } else {
+                                    break
+                                }
+                            }
+                            mut num = 0
+                            while i < n {
+                                c = str_char_at(src, i)
+                                if c >= 48 {
+                                    if c <= 57 {
+                                        num = num * 10 + (c - 48)
+                                        i = i + 1
+                                    } else {
+                                        break
+                                    }
+                                } else {
+                                    break
+                                }
+                            }
+                            map_set(env, key, num)
+                            assigns = assigns + 1
+                        }
+                    }
+                }
+            }
+        }
+        while i < n {
+            c = str_char_at(src, i)
+            if c == 10 {
+                i = i + 1
+                break
+            } else {
+                i = i + 1
+            }
+        }
+    }
+
+    mut ir = "target triple = \"x86_64-unknown-linux-gnu\"\n"
+    ir = str_concat(ir, "declare i32 @printf(ptr, ...)\n")
+    ir = str_concat(ir, "@.fmt = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"\n")
+    ir = str_concat(ir, "define i32 @main() {\nentry:\n")
+    ir = str_concat(ir, "  %f = getelementptr inbounds [6 x i8], ptr @.fmt, i64 0, i64 0\n")
+    ir = str_concat(ir, ir_body)
+    ir = str_concat(ir, "  ret i32 0\n}\n")
+    write_file("bootstrap_out.ll", ir)
+    print assigns
+    print prints
+    print str_len(ir)
+}

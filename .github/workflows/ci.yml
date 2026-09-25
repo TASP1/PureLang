@@ -96,6 +96,9 @@ jobs:
           mkdir -p dist/android
           echo "PureLang Android packaging stub" > dist/android/README.txt
           echo "Use scripts/android_build.sh with ANDROID_NDK_HOME to produce libpureapp.so" >> dist/android/README.txt
+          bash scripts/package_android_aab.sh
+          bash scripts/package_ios_ipa.sh
+          bash scripts/package_desktop.sh dist/desktop || true
       - name: Desktop package
         run: |
           mkdir -p dist/linux

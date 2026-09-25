@@ -835,3 +835,20 @@ void pl_thread_spawn(void *fn) {
 
 int64_t pl_ui_native_available(void) { return 1; }
 #endif
+
+
+int64_t pl_ui_android_available(void) {
+#if defined(__ANDROID__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+int64_t pl_ui_cocoa_available(void) {
+#if defined(__APPLE__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+

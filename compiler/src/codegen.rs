@@ -1319,6 +1319,18 @@ impl Codegen {
                         );
                         return ("0".into(), VarKind::Number);
                     }
+                    if builtin == "ui_android_available" {
+                        let res = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = call i64 @pl_ui_android_available()", res);
+                        return (res, VarKind::Number);
+                    }
+                    if builtin == "ui_cocoa_available" {
+                        let res = self.fresh();
+                        let _ =
+                            writeln!(self.body, "  {} = call i64 @pl_ui_cocoa_available()", res);
+                        return (res, VarKind::Number);
+                    }
                     if builtin == "ui_native_available" {
                         let res = self.fresh();
                         let _ =

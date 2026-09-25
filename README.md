@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.34.0**
+**Compiler:** `purec` **v0.35.0**
 
 ## Quick Example
 
@@ -106,7 +106,7 @@ cargo run --release -- pkg init myapp
 
 ```
 PureLang/
-├── compiler/           # purec v0.34.0 (Rust)
+├── compiler/           # purec v0.35.0 (Rust)
 │   └── src/            # lexer → parser → checker → codegen / wasm / lsp / pkg
 ├── runtime/            # purelang_rt.c (maps, UI, time_ms, strings)
 ├── docs/               # architecture, syntax, platforms, UI, package, …

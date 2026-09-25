@@ -156,6 +156,8 @@ impl TypeChecker {
                 Number,
             ),
             ("ui_native_available", vec![], Number),
+            ("ui_android_available", vec![], Number),
+            ("ui_cocoa_available", vec![], Number),
             ("std_channel_new", vec![], Channel),
             ("std_channel_send", vec![Channel, Number], Number),
             ("std_channel_recv", vec![Channel], Number),

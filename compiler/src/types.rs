@@ -41,6 +41,7 @@ impl Type {
             self,
             Type::Number
                 | Type::Float
+                | Type::String
                 | Type::Bool
                 | Type::Range
                 | Type::Void

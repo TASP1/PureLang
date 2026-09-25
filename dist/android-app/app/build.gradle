@@ -1,0 +1,13 @@
+plugins { id "com.android.application" }
+android {
+    namespace "com.purelang.app"
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.purelang.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "0.35.0"
+    }
+    buildTypes { release { minifyEnabled false } }
+}
