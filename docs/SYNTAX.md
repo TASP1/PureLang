@@ -424,3 +424,18 @@ fn main() {
 ```
 
 MVP: Number parameters and return only for indirect calls.
+
+
+### thread_spawn
+
+```pure
+fn worker() {
+    print 7
+    return 0
+}
+
+fn main() {
+    thread_spawn(worker)
+    sleep_ms(50)
+}
+```

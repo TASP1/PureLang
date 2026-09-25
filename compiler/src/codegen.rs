@@ -317,6 +317,8 @@ impl Codegen {
         self.preamble
             .push_str("declare void @pl_thread_spawn_send(ptr, i64, i64)\n");
         self.preamble
+            .push_str("declare void @pl_thread_spawn(ptr)\n");
+        self.preamble
             .push_str("declare i64 @pl_ui_native_available()\n");
         self.preamble
             .push_str("declare i64 @pl_str_contains(ptr, ptr)\n");
@@ -1298,6 +1300,11 @@ impl Codegen {
                         let _ =
                             writeln!(self.body, "  {} = call i64 @pl_chan_len(ptr {})", res, ch);
                         return (res, VarKind::Number);
+                    }
+                    if builtin == "thread_spawn" {
+                        let (fp, _) = self.emit_expr(&args[0]);
+                        let _ = writeln!(self.body, "  call void @pl_thread_spawn(ptr {})", fp);
+                        return ("1".into(), VarKind::Number);
                     }
                     if builtin == "thread_spawn_send" {
                         let (ch, _) = self.emit_expr(&args[0]);

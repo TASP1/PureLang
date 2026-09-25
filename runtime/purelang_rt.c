@@ -204,6 +204,13 @@ int64_t pl_chan_len(void *ch) { (void)ch; return 0; }
 void pl_thread_spawn_send(void *ch, int64_t delay_ms, int64_t value) {
     (void)ch; (void)delay_ms; (void)value;
 }
+void pl_thread_spawn(void *fn) {
+    (void)fn; /* Windows: stub — call inline for determinism in demos */
+    if (fn) {
+        typedef int64_t (*PLFn0)(void);
+        ((PLFn0)fn)();
+    }
+}
 int64_t pl_ui_native_available(void) { return 0; }
 #else
 
@@ -401,6 +408,23 @@ void pl_thread_spawn_send(void *ch, int64_t delay_ms, int64_t value) {
         pthread_detach(t);
     else
         free(a);
+}
+
+typedef int64_t (*PLFn0)(void);
+
+static void *pl_thread_fn_main(void *arg) {
+    PLFn0 f = (PLFn0)arg;
+    if (f) f();
+    return NULL;
+}
+
+void pl_thread_spawn(void *fn) {
+    if (!fn) return;
+    pthread_t t;
+    if (pthread_create(&t, NULL, pl_thread_fn_main, fn) == 0)
+        pthread_detach(t);
+    else
+        ((PLFn0)fn)(); /* fallback: run on caller thread */
 }
 
 int64_t pl_ui_native_available(void) { return 0; }

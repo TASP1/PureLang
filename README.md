@@ -8,7 +8,7 @@
 - Native execution on desktop, mobile, web, and consoles
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
-**Compiler:** `purec` **v0.28.1**
+**Compiler:** `purec` **v0.29.0**
 
 ## Quick Example
 
@@ -48,7 +48,7 @@ fn main() {
 - [x] Control flow: `if` / `for` / **`while` / `break` / `continue`**
 - [x] Types: Number, **Float**, String, Bool, List, **Map**, structs, enums
 - [x] **assert**, **exit**, **time_ms**, **sleep_ms**, **http_get**
-- [x] **Channels / threads** (`channel_new/send/recv`, `thread_spawn_send`)
+- [x] **Channels / threads** (`channel_new/send/recv`, `thread_spawn_send`, **`thread_spawn(fn)`**)
 - [x] **Mobile sysroot scripts** (`scripts/android_build.sh`, `ios_build.sh`)
 - [x] **Self-host bootstrap** (`bootstrap/`)
 
@@ -69,7 +69,7 @@ fn main() {
 - [x] Golden output tests (`tests/run.sh`)
 
 ### Next
-- [ ] `thread_spawn(fn)` — spawn a zero-arg function value on a thread
+- [x] `thread_spawn(fn)` — spawn a zero-arg function value on a thread
 - [ ] Native UI backends (beyond HTML export)
 - [ ] iOS / Android sysroot automation in CI
 - [ ] Self-hosting compiler (beyond bootstrap seeds)
@@ -104,7 +104,7 @@ cargo run --release -- pkg init myapp
 
 ```
 PureLang/
-├── compiler/           # purec v0.28.1 (Rust)
+├── compiler/           # purec v0.29.0 (Rust)
 │   └── src/            # lexer → parser → checker → codegen / wasm / lsp / pkg
 ├── runtime/            # purelang_rt.c (maps, UI, time_ms, strings)
 ├── docs/               # architecture, syntax, platforms, UI, package, …

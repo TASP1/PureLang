@@ -138,6 +138,23 @@ impl TypeChecker {
             ("channel_recv", vec![Channel], Number),
             ("channel_len", vec![Channel], Number),
             ("thread_spawn_send", vec![Channel, Number, Number], Number),
+            // Spawn zero-arg function value on a background thread
+            (
+                "thread_spawn",
+                vec![Function {
+                    params: vec![],
+                    ret: Box::new(Number),
+                }],
+                Number,
+            ),
+            (
+                "std_thread_spawn",
+                vec![Function {
+                    params: vec![],
+                    ret: Box::new(Number),
+                }],
+                Number,
+            ),
             ("ui_native_available", vec![], Number),
             ("std_channel_new", vec![], Channel),
             ("std_channel_send", vec![Channel, Number], Number),

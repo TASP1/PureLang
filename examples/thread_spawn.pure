@@ -1,0 +1,14 @@
+// thread_spawn(fn) — run a zero-arg function on a background thread
+
+fn worker() {
+    print 7
+    return 0
+}
+
+fn main() {
+    f = worker
+    thread_spawn(f)
+    // give the worker a moment
+    sleep_ms(80)
+    print 1
+}

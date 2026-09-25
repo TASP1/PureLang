@@ -1,4 +1,4 @@
-# PureLang completion status (v0.28.1)
+# PureLang completion status (v0.29.0)
 
 Honest snapshot of the five “complete all” tracks.
 
@@ -17,5 +17,5 @@ These foundations are **usable for demos and further development**. They are **n
 Next engineering priority: **`thread_spawn(fn)`** using function values; then Windows threads/channels; then self-host lexer growth.
 
 
-## v0.28.1
+## v0.29.0
 - str_char_at / str_slice — bootstrap lexer progress
