@@ -9,6 +9,7 @@
 
 **Repository:** [TASP1/PureLang](https://github.com/TASP1/PureLang) (public · MIT)  
 **Compiler:** `purec` **v0.37.0**  
+**Roadmap:** [docs/ROADMAP.md](docs/ROADMAP.md) (phases A→E)  
 **Product readiness (honest):** ~**62%** overall · ~**85%** desktop compiler usable
 
 ## Quick Example

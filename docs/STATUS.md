@@ -1,5 +1,7 @@
 # PureLang completion status (v0.37.0)
 
+**Plan:** see [ROADMAP.md](ROADMAP.md) for phases A–E and implementation order.
+
 Honest snapshot of language, tooling, and product tracks.
 
 ## Overall completion (weighted estimate)
