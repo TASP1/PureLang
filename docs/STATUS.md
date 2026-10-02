@@ -1,4 +1,4 @@
-# PureLang completion status (v0.37.0)
+# PureLang completion status (v0.38.0)
 
 **Plan:** see [ROADMAP.md](ROADMAP.md) for phases A–E and implementation order.
 
@@ -11,7 +11,7 @@ Honest snapshot of language, tooling, and product tracks.
 | Core language (syntax → native) | 25% | **90%** | Full purec in Rust; gaps: richer types, GC-free edge cases |
 | Stdlib / runtime | 15% | **75%** | Maps, strings, files, HTTPS, threads; partial UI |
 | Self-host purec_sub | 15% | **45%** | if/while, multi-letter ids, + , file in; no modules/types/fns yet |
-| Tooling (LSP, fmt, pkg, CI) | 15% | **80%** | CI multi-OS, NDK/iOS checks, packages |
+| Tooling (LSP, fmt, pkg, CI) | 15% | **85%** | CI + expanded golden suite (Phase A4) |
 | Mobile hosts | 10% | **40%** | Gradle host Activity + JNI slot; Cocoa alert path |
 | Store pipelines | 10% | **35%** | Package trees + **STORE_SIGNING.md**; no auto-upload |
 | Native UI SDKs | 10% | **30%** | Win32 widgets; HTML; not full UIKit/Jetpack |
@@ -29,7 +29,7 @@ Honest snapshot of language, tooling, and product tracks.
 | iOS / Android | Scripts + Gradle host + signing docs |
 | Self-hosting | purec_sub: assign, print, +, **if**, **while**, multi-letter ids |
 
-## v0.37.0
+## v0.38.0
 - purec_sub: **if** / **while** (compile-time interpret), multi-letter identifiers
 - sample `bootstrap/samples/control.pure` → IR prints 10, 1, 42
 - docs/STORE_SIGNING.md (Play AAB + iOS archive, no auto-upload)

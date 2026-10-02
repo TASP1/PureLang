@@ -67,7 +67,7 @@ PureLang aims to be a **systems language** that is:
 | A1 | Stronger ownership (use-after-move on maps/structs consistent; clearer errors) | Spec in MEMORY_MODEL + tests |
 | A2 | Clearer type rules (Number vs Float promotion documented; reject nonsense mixes) | SYNTAX + golden tests |
 | A3 | String model (copy vs move policy locked; UTF-8 length documented) | MEMORY_MODEL + tests |
-| A4 | Expand golden tests to ≥30 examples with expected stdout | `tests/run.sh` green in CI |
+| A4 | Expand golden tests to ≥30 examples with expected stdout | **Done (v0.38)** `tests/run.sh` |
 | A5 | Clippy + fmt + all platforms green on every push | CI matrix all success |
 
 **Exit criteria:** New contributor can write a 200-line tool without fighting the checker daily.

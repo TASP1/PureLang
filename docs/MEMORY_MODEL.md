@@ -63,3 +63,20 @@ These will surface more clearly as the type system matures. For early code, the 
 | **PureLang**          | Zero         | High            | **Very Low**      |
 
 PureLang takes the safety and performance of ownership systems and packages them in the simplest practical syntax.
+
+
+## Ownership policy (v0.38)
+
+| Type | Default | Notes |
+|------|---------|-------|
+| Number, Float, Bool | Copy | Trivial |
+| String | **Copy** | Practical for self-host and scripting; not a unique heap owner |
+| Map | **Move** | Runtime pointer; use after move is an error |
+| List, Struct | Copy (MVP) | Field/index access borrows |
+| Function values | Copy | Function pointer semantics |
+
+### Use-after-move
+
+Moving a `Map` (assignment or by-value pass where not borrowed) marks the binding unusable until reassigned.
+
+Reading builtins (`map_get`, `str_len`, …) **borrow** and do not move.
