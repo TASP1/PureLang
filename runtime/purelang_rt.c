@@ -852,3 +852,24 @@ int64_t pl_ui_cocoa_available(void) {
 #endif
 }
 
+
+
+/* Deeper Cocoa host path: osascript dialog (no ObjC runtime required in pure C) */
+void pl_ui_cocoa_alert(char *title, char *msg) {
+#if defined(__APPLE__)
+    const char *t = title ? title : "PureLang";
+    const char *m = msg ? msg : "";
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd),
+        "osascript -e 'display dialog \"%s\" with title \"%s\" buttons {\"OK\"} default button 1' 2>/dev/null",
+        m, t);
+    system(cmd);
+#else
+    pl_ui_alert(title, msg);
+#endif
+}
+
+void pl_ui_android_toast(char *msg) {
+    (void)msg;
+    /* Full toast requires JNI; host MainActivity shows Toast from Java. */
+}

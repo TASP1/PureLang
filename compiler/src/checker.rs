@@ -175,6 +175,7 @@ impl TypeChecker {
             ("ui_label", vec![String], Number),
             ("ui_end", vec![], Number),
             ("ui_alert", vec![String, String], Number),
+            ("ui_cocoa_alert", vec![String, String], Number),
             ("ui_window_show", vec![String, String], Number),
             ("ui_add_button", vec![String], Number),
             ("ui_add_edit", vec![String], Number),

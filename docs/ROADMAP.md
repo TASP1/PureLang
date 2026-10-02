@@ -1,3 +1,9 @@
+## Current (v0.37)
+
+- purec_sub if/while + multi-letter ids
+- Store signing docs (manual upload)
+- Android host Activity + Cocoa alert
+
 # PureLang Roadmap
 
 ## Current Status (September 2026)

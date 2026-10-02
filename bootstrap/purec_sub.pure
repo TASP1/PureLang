@@ -1,19 +1,20 @@
-// PureLang subset compiler v0.36
-// Supports:
-//   x = <int>
-//   print <int>
-//   print <var>
-//   print <var|int> + <var|int>
-// Reads bootstrap/samples/add.pure when present, else embedded source.
+// PureLang subset compiler v0.37
+// Supports multi-letter ids, assign, print expr (+), if, while (compile-time interpret)
+// Source: bootstrap/samples/control.pure or add.pure
 
 fn main() {
-    mut src = "x = 40\ny = 2\nprint x + y\nprint 7\n"
-    // Prefer file if readable
+    mut src = "sum = 0\ni = 0\nwhile i < 5 {\n  sum = sum + i\n  i = i + 1\n}\nprint sum\n"
     mut from_file = 0
-    f = read_file("bootstrap/samples/add.pure")
+    f = read_file("bootstrap/samples/control.pure")
     if str_len(f) > 0 {
         src = f
         from_file = 1
+    } else {
+        f2 = read_file("bootstrap/samples/add.pure")
+        if str_len(f2) > 0 {
+            src = f2
+            from_file = 1
+        }
     }
 
     n = str_len(src)
@@ -21,10 +22,13 @@ fn main() {
     mut i = 0
     mut assigns = 0
     mut prints = 0
+    mut loops = 0
+    mut ifs = 0
     mut ir_body = ""
 
     while i < n {
-        mut c = str_char_at(src, i)
+        // skip ws
+        mut c = 0
         while i < n {
             c = str_char_at(src, i)
             if c == 32 {
@@ -36,7 +40,11 @@ fn main() {
                     if c == 13 {
                         i = i + 1
                     } else {
-                        break
+                        if c == 9 {
+                            i = i + 1
+                        } else {
+                            break
+                        }
                     }
                 }
             }
@@ -46,131 +54,11 @@ fn main() {
         }
         c = str_char_at(src, i)
 
-        // print ...
-        if c == 112 {
+        // while
+        if c == 119 {
             if i + 5 <= n {
-                if str_char_at(src, i + 1) == 114 {
-                    if str_char_at(src, i + 2) == 105 {
-                        if str_char_at(src, i + 3) == 110 {
-                            if str_char_at(src, i + 4) == 116 {
-                                i = i + 5
-                                while i < n {
-                                    c = str_char_at(src, i)
-                                    if c == 32 {
-                                        i = i + 1
-                                    } else {
-                                        break
-                                    }
-                                }
-                                // parse primary (number or single-letter var)
-                                mut left = 0
-                                c = str_char_at(src, i)
-                                if c >= 48 {
-                                    if c <= 57 {
-                                        while i < n {
-                                            c = str_char_at(src, i)
-                                            if c >= 48 {
-                                                if c <= 57 {
-                                                    left = left * 10 + (c - 48)
-                                                    i = i + 1
-                                                } else {
-                                                    break
-                                                }
-                                            } else {
-                                                break
-                                            }
-                                        }
-                                    } else {
-                                        if c >= 97 {
-                                            if c <= 122 {
-                                                mut k = str_slice(src, i, i + 1)
-                                                left = map_get(env, k)
-                                                i = i + 1
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    if c >= 97 {
-                                        if c <= 122 {
-                                            mut k = str_slice(src, i, i + 1)
-                                            left = map_get(env, k)
-                                            i = i + 1
-                                        }
-                                    }
-                                }
-                                // optional + right
-                                while i < n {
-                                    c = str_char_at(src, i)
-                                    if c == 32 {
-                                        i = i + 1
-                                    } else {
-                                        break
-                                    }
-                                }
-                                if i < n {
-                                    if str_char_at(src, i) == 43 {
-                                        i = i + 1
-                                        while i < n {
-                                            c = str_char_at(src, i)
-                                            if c == 32 {
-                                                i = i + 1
-                                            } else {
-                                                break
-                                            }
-                                        }
-                                        mut right = 0
-                                        c = str_char_at(src, i)
-                                        if c >= 48 {
-                                            if c <= 57 {
-                                                while i < n {
-                                                    c = str_char_at(src, i)
-                                                    if c >= 48 {
-                                                        if c <= 57 {
-                                                            right = right * 10 + (c - 48)
-                                                            i = i + 1
-                                                        } else {
-                                                            break
-                                                        }
-                                                    } else {
-                                                        break
-                                                    }
-                                                }
-                                            } else {
-                                                if c >= 97 {
-                                                    if c <= 122 {
-                                                        mut k2 = str_slice(src, i, i + 1)
-                                                        right = map_get(env, k2)
-                                                        i = i + 1
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            if c >= 97 {
-                                                if c <= 122 {
-                                                    mut k2 = str_slice(src, i, i + 1)
-                                                    right = map_get(env, k2)
-                                                    i = i + 1
-                                                }
-                                            }
-                                        }
-                                        left = left + right
-                                    }
-                                }
-                                ir_body = str_concat(ir_body, "  call i32 (ptr, ...) @printf(ptr %f, i64 ")
-                                ir_body = str_concat(ir_body, str_from_num(left))
-                                ir_body = str_concat(ir_body, ")\n")
-                                prints = prints + 1
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // assign letter = number
-            if c >= 97 {
-                if c <= 122 {
-                    mut key = str_slice(src, i, i + 1)
-                    i = i + 1
+                if str_eq(str_slice(src, i, i + 5), "while") == 1 {
+                    i = i + 5
                     while i < n {
                         c = str_char_at(src, i)
                         if c == 32 {
@@ -179,9 +67,943 @@ fn main() {
                             break
                         }
                     }
-                    if i < n {
-                        if str_char_at(src, i) == 61 {
+                    // condition: ident op number  (ident < number)
+                    mut ca = i
+                    while i < n {
+                        c = str_char_at(src, i)
+                        if c >= 97 {
+                            if c <= 122 {
+                                i = i + 1
+                            } else {
+                                if c >= 65 {
+                                    if c <= 90 {
+                                        i = i + 1
+                                    } else {
+                                        if c >= 48 {
+                                            if c <= 57 {
+                                                i = i + 1
+                                            } else {
+                                                if c == 95 {
+                                                    i = i + 1
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                        } else {
+                                            if c == 95 {
+                                                i = i + 1
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    if c >= 48 {
+                                        if c <= 57 {
+                                            i = i + 1
+                                        } else {
+                                            if c == 95 {
+                                                i = i + 1
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                    } else {
+                                        if c == 95 {
+                                            i = i + 1
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            if c >= 65 {
+                                if c <= 90 {
+                                    i = i + 1
+                                } else {
+                                    break
+                                }
+                            } else {
+                                break
+                            }
+                        }
+                    }
+                    mut cname = str_slice(src, ca, i)
+                    while i < n {
+                        c = str_char_at(src, i)
+                        if c == 32 {
                             i = i + 1
+                        } else {
+                            break
+                        }
+                    }
+                    mut op = 0
+                    if i < n {
+                        c = str_char_at(src, i)
+                        if c == 60 {
+                            op = 1
+                            i = i + 1
+                            if i < n {
+                                if str_char_at(src, i) == 61 {
+                                    op = 2
+                                    i = i + 1
+                                }
+                            }
+                        } else {
+                            if c == 62 {
+                                op = 3
+                                i = i + 1
+                                if i < n {
+                                    if str_char_at(src, i) == 61 {
+                                        op = 4
+                                        i = i + 1
+                                    }
+                                }
+                            } else {
+                                if c == 61 {
+                                    if i + 1 < n {
+                                        if str_char_at(src, i + 1) == 61 {
+                                            op = 5
+                                            i = i + 2
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    while i < n {
+                        c = str_char_at(src, i)
+                        if c == 32 {
+                            i = i + 1
+                        } else {
+                            break
+                        }
+                    }
+                    mut cnum = 0
+                    while i < n {
+                        c = str_char_at(src, i)
+                        if c >= 48 {
+                            if c <= 57 {
+                                cnum = cnum * 10 + (c - 48)
+                                i = i + 1
+                            } else {
+                                break
+                            }
+                        } else {
+                            break
+                        }
+                    }
+                    while i < n {
+                        c = str_char_at(src, i)
+                        if c == 32 {
+                            i = i + 1
+                        } else {
+                            break
+                        }
+                    }
+                    // expect {
+                    if i < n {
+                        if str_char_at(src, i) == 123 {
+                            i = i + 1
+                        }
+                    }
+                    mut body_start = i
+                    mut depth = 1
+                    while i < n {
+                        if depth == 0 {
+                            break
+                        }
+                        c = str_char_at(src, i)
+                        if c == 123 {
+                            depth = depth + 1
+                        } else {
+                            if c == 125 {
+                                depth = depth - 1
+                            }
+                        }
+                        if depth > 0 {
+                            i = i + 1
+                        }
+                    }
+                    mut body_end = i
+                    if i < n {
+                        if str_char_at(src, i) == 125 {
+                            i = i + 1
+                        }
+                    }
+                    // interpret while at compile time (max 1000 iters)
+                    mut guard = 0
+                    while guard < 1000 {
+                        mut lv = map_get(env, cname)
+                        mut ok = 0
+                        if op == 1 {
+                            if lv < cnum {
+                                ok = 1
+                            }
+                        } else {
+                            if op == 2 {
+                                if lv < cnum {
+                                    ok = 1
+                                } else {
+                                    if lv == cnum {
+                                        ok = 1
+                                    }
+                                }
+                            } else {
+                                if op == 3 {
+                                    if lv > cnum {
+                                        ok = 1
+                                    }
+                                } else {
+                                    if op == 4 {
+                                        if lv > cnum {
+                                            ok = 1
+                                        } else {
+                                            if lv == cnum {
+                                                ok = 1
+                                            }
+                                        }
+                                    } else {
+                                        if op == 5 {
+                                            if lv == cnum {
+                                                ok = 1
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if ok == 0 {
+                            break
+                        }
+                        // execute body statements once (nested simple assigns/prints)
+                        mut j = body_start
+                        while j < body_end {
+                            while j < body_end {
+                                c = str_char_at(src, j)
+                                if c == 32 {
+                                    j = j + 1
+                                } else {
+                                    if c == 10 {
+                                        j = j + 1
+                                    } else {
+                                        break
+                                    }
+                                }
+                            }
+                            if j >= body_end {
+                                break
+                            }
+                            c = str_char_at(src, j)
+                            // print in body
+                            if c == 112 {
+                                if j + 5 <= n {
+                                    if str_eq(str_slice(src, j, j + 5), "print") == 1 {
+                                        j = j + 5
+                                        while j < body_end {
+                                            c = str_char_at(src, j)
+                                            if c == 32 {
+                                                j = j + 1
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                        mut pv = 0
+                                        c = str_char_at(src, j)
+                                        if c >= 48 {
+                                            if c <= 57 {
+                                                while j < body_end {
+                                                    c = str_char_at(src, j)
+                                                    if c >= 48 {
+                                                        if c <= 57 {
+                                                            pv = pv * 10 + (c - 48)
+                                                            j = j + 1
+                                                        } else {
+                                                            break
+                                                        }
+                                                    } else {
+                                                        break
+                                                    }
+                                                }
+                                            } else {
+                                                mut pa = j
+                                                while j < body_end {
+                                                    c = str_char_at(src, j)
+                                                    if c >= 97 {
+                                                        if c <= 122 {
+                                                            j = j + 1
+                                                        } else {
+                                                            if c >= 48 {
+                                                                if c <= 57 {
+                                                                    j = j + 1
+                                                                } else {
+                                                                    if c == 95 {
+                                                                        j = j + 1
+                                                                    } else {
+                                                                        break
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                if c == 95 {
+                                                                    j = j + 1
+                                                                } else {
+                                                                    break
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        if c >= 65 {
+                                                            if c <= 90 {
+                                                                j = j + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                                pv = map_get(env, str_slice(src, pa, j))
+                                            }
+                                        } else {
+                                            mut pa2 = j
+                                            while j < body_end {
+                                                c = str_char_at(src, j)
+                                                if c >= 97 {
+                                                    if c <= 122 {
+                                                        j = j + 1
+                                                    } else {
+                                                        if c >= 48 {
+                                                            if c <= 57 {
+                                                                j = j + 1
+                                                            } else {
+                                                                if c == 95 {
+                                                                    j = j + 1
+                                                                } else {
+                                                                    break
+                                                                }
+                                                            }
+                                                        } else {
+                                                            if c == 95 {
+                                                                j = j + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                            pv = map_get(env, str_slice(src, pa2, j))
+                                        }
+                                        ir_body = str_concat(ir_body, "  call i32 (ptr, ...) @printf(ptr %f, i64 ")
+                                        ir_body = str_concat(ir_body, str_from_num(pv))
+                                        ir_body = str_concat(ir_body, ")\n")
+                                        prints = prints + 1
+                                    }
+                                }
+                            } else {
+                                // assign in body: name = expr
+                                if c >= 97 {
+                                    if c <= 122 {
+                                        mut aa = j
+                                        while j < body_end {
+                                            c = str_char_at(src, j)
+                                            if c >= 97 {
+                                                if c <= 122 {
+                                                    j = j + 1
+                                                } else {
+                                                    if c >= 48 {
+                                                        if c <= 57 {
+                                                            j = j + 1
+                                                        } else {
+                                                            if c == 95 {
+                                                                j = j + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        }
+                                                    } else {
+                                                        if c == 95 {
+                                                            j = j + 1
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                if c >= 65 {
+                                                    if c <= 90 {
+                                                        j = j + 1
+                                                    } else {
+                                                        break
+                                                    }
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                        }
+                                        mut aname = str_slice(src, aa, j)
+                                        while j < body_end {
+                                            c = str_char_at(src, j)
+                                            if c == 32 {
+                                                j = j + 1
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                        if j < body_end {
+                                            if str_char_at(src, j) == 61 {
+                                                j = j + 1
+                                                while j < body_end {
+                                                    c = str_char_at(src, j)
+                                                    if c == 32 {
+                                                        j = j + 1
+                                                    } else {
+                                                        break
+                                                    }
+                                                }
+                                                // expr: number | ident | ident + ident|number
+                                                mut av = 0
+                                                c = str_char_at(src, j)
+                                                if c >= 48 {
+                                                    if c <= 57 {
+                                                        while j < body_end {
+                                                            c = str_char_at(src, j)
+                                                            if c >= 48 {
+                                                                if c <= 57 {
+                                                                    av = av * 10 + (c - 48)
+                                                                    j = j + 1
+                                                                } else {
+                                                                    break
+                                                                }
+                                                            } else {
+                                                                break
+                                                            }
+                                                        }
+                                                    } else {
+                                                        mut ba = j
+                                                        while j < body_end {
+                                                            c = str_char_at(src, j)
+                                                            if c >= 97 {
+                                                                if c <= 122 {
+                                                                    j = j + 1
+                                                                } else {
+                                                                    if c >= 48 {
+                                                                        if c <= 57 {
+                                                                            j = j + 1
+                                                                        } else {
+                                                                            if c == 95 {
+                                                                                j = j + 1
+                                                                            } else {
+                                                                                break
+                                                                            }
+                                                                        }
+                                                                    } else {
+                                                                        if c == 95 {
+                                                                            j = j + 1
+                                                                        } else {
+                                                                            break
+                                                                        }
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                break
+                                                            }
+                                                        }
+                                                        av = map_get(env, str_slice(src, ba, j))
+                                                    }
+                                                } else {
+                                                    mut ba2 = j
+                                                    while j < body_end {
+                                                        c = str_char_at(src, j)
+                                                        if c >= 97 {
+                                                            if c <= 122 {
+                                                                j = j + 1
+                                                            } else {
+                                                                if c >= 48 {
+                                                                    if c <= 57 {
+                                                                        j = j + 1
+                                                                    } else {
+                                                                        if c == 95 {
+                                                                            j = j + 1
+                                                                        } else {
+                                                                            break
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    if c == 95 {
+                                                                        j = j + 1
+                                                                    } else {
+                                                                        break
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                    av = map_get(env, str_slice(src, ba2, j))
+                                                }
+                                                while j < body_end {
+                                                    c = str_char_at(src, j)
+                                                    if c == 32 {
+                                                        j = j + 1
+                                                    } else {
+                                                        break
+                                                    }
+                                                }
+                                                if j < body_end {
+                                                    if str_char_at(src, j) == 43 {
+                                                        j = j + 1
+                                                        while j < body_end {
+                                                            c = str_char_at(src, j)
+                                                            if c == 32 {
+                                                                j = j + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        }
+                                                        mut rv = 0
+                                                        c = str_char_at(src, j)
+                                                        if c >= 48 {
+                                                            if c <= 57 {
+                                                                while j < body_end {
+                                                                    c = str_char_at(src, j)
+                                                                    if c >= 48 {
+                                                                        if c <= 57 {
+                                                                            rv = rv * 10 + (c - 48)
+                                                                            j = j + 1
+                                                                        } else {
+                                                                            break
+                                                                        }
+                                                                    } else {
+                                                                        break
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                mut ra = j
+                                                                while j < body_end {
+                                                                    c = str_char_at(src, j)
+                                                                    if c >= 97 {
+                                                                        if c <= 122 {
+                                                                            j = j + 1
+                                                                        } else {
+                                                                            if c >= 48 {
+                                                                                if c <= 57 {
+                                                                                    j = j + 1
+                                                                                } else {
+                                                                                    if c == 95 {
+                                                                                        j = j + 1
+                                                                                    } else {
+                                                                                        break
+                                                                                    }
+                                                                                }
+                                                                            } else {
+                                                                                if c == 95 {
+                                                                                    j = j + 1
+                                                                                } else {
+                                                                                    break
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    } else {
+                                                                        break
+                                                                    }
+                                                                }
+                                                                rv = map_get(env, str_slice(src, ra, j))
+                                                            }
+                                                        } else {
+                                                            mut ra2 = j
+                                                            while j < body_end {
+                                                                c = str_char_at(src, j)
+                                                                if c >= 97 {
+                                                                    if c <= 122 {
+                                                                        j = j + 1
+                                                                    } else {
+                                                                        if c >= 48 {
+                                                                            if c <= 57 {
+                                                                                j = j + 1
+                                                                            } else {
+                                                                                if c == 95 {
+                                                                                    j = j + 1
+                                                                                } else {
+                                                                                    break
+                                                                                }
+                                                                            }
+                                                                        } else {
+                                                                            if c == 95 {
+                                                                                j = j + 1
+                                                                            } else {
+                                                                                break
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    break
+                                                                }
+                                                            }
+                                                            rv = map_get(env, str_slice(src, ra2, j))
+                                                        }
+                                                        av = av + rv
+                                                    }
+                                                }
+                                                map_set(env, aname, av)
+                                                assigns = assigns + 1
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            while j < body_end {
+                                c = str_char_at(src, j)
+                                if c == 10 {
+                                    j = j + 1
+                                    break
+                                } else {
+                                    j = j + 1
+                                }
+                            }
+                        }
+                        guard = guard + 1
+                    }
+                    loops = loops + 1
+                } else {
+                    i = i + 1
+                }
+            } else {
+                i = i + 1
+            }
+        } else {
+            // if
+            if c == 105 {
+                if i + 2 <= n {
+                    if str_eq(str_slice(src, i, i + 2), "if") == 1 {
+                        i = i + 2
+                        while i < n {
+                            c = str_char_at(src, i)
+                            if c == 32 {
+                                i = i + 1
+                            } else {
+                                break
+                            }
+                        }
+                        mut ia = i
+                        while i < n {
+                            c = str_char_at(src, i)
+                            if c >= 97 {
+                                if c <= 122 {
+                                    i = i + 1
+                                } else {
+                                    if c >= 48 {
+                                        if c <= 57 {
+                                            i = i + 1
+                                        } else {
+                                            if c == 95 {
+                                                i = i + 1
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                    } else {
+                                        if c == 95 {
+                                            i = i + 1
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                }
+                            } else {
+                                break
+                            }
+                        }
+                        mut iname = str_slice(src, ia, i)
+                        while i < n {
+                            c = str_char_at(src, i)
+                            if c == 32 {
+                                i = i + 1
+                            } else {
+                                break
+                            }
+                        }
+                        mut iop = 0
+                        if i < n {
+                            c = str_char_at(src, i)
+                            if c == 60 {
+                                iop = 1
+                                i = i + 1
+                                if i < n {
+                                    if str_char_at(src, i) == 61 {
+                                        iop = 2
+                                        i = i + 1
+                                    }
+                                }
+                            } else {
+                                if c == 62 {
+                                    iop = 3
+                                    i = i + 1
+                                    if i < n {
+                                        if str_char_at(src, i) == 61 {
+                                            iop = 4
+                                            i = i + 1
+                                        }
+                                    }
+                                } else {
+                                    if c == 61 {
+                                        if i + 1 < n {
+                                            if str_char_at(src, i + 1) == 61 {
+                                                iop = 5
+                                                i = i + 2
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        while i < n {
+                            c = str_char_at(src, i)
+                            if c == 32 {
+                                i = i + 1
+                            } else {
+                                break
+                            }
+                        }
+                        mut inum = 0
+                        while i < n {
+                            c = str_char_at(src, i)
+                            if c >= 48 {
+                                if c <= 57 {
+                                    inum = inum * 10 + (c - 48)
+                                    i = i + 1
+                                } else {
+                                    break
+                                }
+                            } else {
+                                break
+                            }
+                        }
+                        while i < n {
+                            c = str_char_at(src, i)
+                            if c == 32 {
+                                i = i + 1
+                            } else {
+                                break
+                            }
+                        }
+                        if i < n {
+                            if str_char_at(src, i) == 123 {
+                                i = i + 1
+                            }
+                        }
+                        mut ibs = i
+                        mut id = 1
+                        while i < n {
+                            if id == 0 {
+                                break
+                            }
+                            c = str_char_at(src, i)
+                            if c == 123 {
+                                id = id + 1
+                            } else {
+                                if c == 125 {
+                                    id = id - 1
+                                }
+                            }
+                            if id > 0 {
+                                i = i + 1
+                            }
+                        }
+                        mut ibe = i
+                        if i < n {
+                            if str_char_at(src, i) == 125 {
+                                i = i + 1
+                            }
+                        }
+                        mut ilv = map_get(env, iname)
+                        mut iok = 0
+                        if iop == 1 {
+                            if ilv < inum {
+                                iok = 1
+                            }
+                        } else {
+                            if iop == 3 {
+                                if ilv > inum {
+                                    iok = 1
+                                }
+                            } else {
+                                if iop == 5 {
+                                    if ilv == inum {
+                                        iok = 1
+                                    }
+                                } else {
+                                    if iop == 2 {
+                                        if ilv < inum {
+                                            iok = 1
+                                        } else {
+                                            if ilv == inum {
+                                                iok = 1
+                                            }
+                                        }
+                                    } else {
+                                        if iop == 4 {
+                                            if ilv > inum {
+                                                iok = 1
+                                            } else {
+                                                if ilv == inum {
+                                                    iok = 1
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if iok == 1 {
+                            // run body prints only for simplicity
+                            mut j = ibs
+                            while j < ibe {
+                                while j < ibe {
+                                    c = str_char_at(src, j)
+                                    if c == 32 {
+                                        j = j + 1
+                                    } else {
+                                        if c == 10 {
+                                            j = j + 1
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                }
+                                if j >= ibe {
+                                    break
+                                }
+                                c = str_char_at(src, j)
+                                if c == 112 {
+                                    if j + 5 <= n {
+                                        if str_eq(str_slice(src, j, j + 5), "print") == 1 {
+                                            j = j + 5
+                                            while j < ibe {
+                                                c = str_char_at(src, j)
+                                                if c == 32 {
+                                                    j = j + 1
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                            mut pv = 0
+                                            c = str_char_at(src, j)
+                                            if c >= 48 {
+                                                if c <= 57 {
+                                                    while j < ibe {
+                                                        c = str_char_at(src, j)
+                                                        if c >= 48 {
+                                                            if c <= 57 {
+                                                                pv = pv * 10 + (c - 48)
+                                                                j = j + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                } else {
+                                                    mut pa = j
+                                                    while j < ibe {
+                                                        c = str_char_at(src, j)
+                                                        if c >= 97 {
+                                                            if c <= 122 {
+                                                                j = j + 1
+                                                            } else {
+                                                                if c >= 48 {
+                                                                    if c <= 57 {
+                                                                        j = j + 1
+                                                                    } else {
+                                                                        if c == 95 {
+                                                                            j = j + 1
+                                                                        } else {
+                                                                            break
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    if c == 95 {
+                                                                        j = j + 1
+                                                                    } else {
+                                                                        break
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                    pv = map_get(env, str_slice(src, pa, j))
+                                                }
+                                            } else {
+                                                mut pa3 = j
+                                                while j < ibe {
+                                                    c = str_char_at(src, j)
+                                                    if c >= 97 {
+                                                        if c <= 122 {
+                                                            j = j + 1
+                                                        } else {
+                                                            if c >= 48 {
+                                                                if c <= 57 {
+                                                                    j = j + 1
+                                                                } else {
+                                                                    if c == 95 {
+                                                                        j = j + 1
+                                                                    } else {
+                                                                        break
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                if c == 95 {
+                                                                    j = j + 1
+                                                                } else {
+                                                                    break
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        break
+                                                    }
+                                                }
+                                                pv = map_get(env, str_slice(src, pa3, j))
+                                            }
+                                            ir_body = str_concat(ir_body, "  call i32 (ptr, ...) @printf(ptr %f, i64 ")
+                                            ir_body = str_concat(ir_body, str_from_num(pv))
+                                            ir_body = str_concat(ir_body, ")\n")
+                                            prints = prints + 1
+                                        }
+                                    }
+                                }
+                                while j < ibe {
+                                    c = str_char_at(src, j)
+                                    if c == 10 {
+                                        j = j + 1
+                                        break
+                                    } else {
+                                        j = j + 1
+                                    }
+                                }
+                            }
+                        }
+                        ifs = ifs + 1
+                    } else {
+                        i = i + 1
+                    }
+                } else {
+                    i = i + 1
+                }
+            } else {
+                // print
+                if c == 112 {
+                    if i + 5 <= n {
+                        if str_eq(str_slice(src, i, i + 5), "print") == 1 {
+                            i = i + 5
                             while i < n {
                                 c = str_char_at(src, i)
                                 if c == 32 {
@@ -190,23 +1012,462 @@ fn main() {
                                     break
                                 }
                             }
-                            mut num = 0
-                            while i < n {
-                                c = str_char_at(src, i)
-                                if c >= 48 {
-                                    if c <= 57 {
-                                        num = num * 10 + (c - 48)
-                                        i = i + 1
+                            mut left = 0
+                            c = str_char_at(src, i)
+                            if c >= 48 {
+                                if c <= 57 {
+                                    while i < n {
+                                        c = str_char_at(src, i)
+                                        if c >= 48 {
+                                            if c <= 57 {
+                                                left = left * 10 + (c - 48)
+                                                i = i + 1
+                                            } else {
+                                                break
+                                            }
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                } else {
+                                    mut la = i
+                                    while i < n {
+                                        c = str_char_at(src, i)
+                                        if c >= 97 {
+                                            if c <= 122 {
+                                                i = i + 1
+                                            } else {
+                                                if c >= 48 {
+                                                    if c <= 57 {
+                                                        i = i + 1
+                                                    } else {
+                                                        if c == 95 {
+                                                            i = i + 1
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                } else {
+                                                    if c == 95 {
+                                                        i = i + 1
+                                                    } else {
+                                                        break
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            if c >= 65 {
+                                                if c <= 90 {
+                                                    i = i + 1
+                                                } else {
+                                                    break
+                                                }
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                    }
+                                    left = map_get(env, str_slice(src, la, i))
+                                }
+                            } else {
+                                mut la2 = i
+                                while i < n {
+                                    c = str_char_at(src, i)
+                                    if c >= 97 {
+                                        if c <= 122 {
+                                            i = i + 1
+                                        } else {
+                                            if c >= 48 {
+                                                if c <= 57 {
+                                                    i = i + 1
+                                                } else {
+                                                    if c == 95 {
+                                                        i = i + 1
+                                                    } else {
+                                                        break
+                                                    }
+                                                }
+                                            } else {
+                                                if c == 95 {
+                                                    i = i + 1
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                        }
                                     } else {
                                         break
                                     }
+                                }
+                                left = map_get(env, str_slice(src, la2, i))
+                            }
+                            while i < n {
+                                c = str_char_at(src, i)
+                                if c == 32 {
+                                    i = i + 1
                                 } else {
                                     break
                                 }
                             }
-                            map_set(env, key, num)
-                            assigns = assigns + 1
+                            if i < n {
+                                if str_char_at(src, i) == 43 {
+                                    i = i + 1
+                                    while i < n {
+                                        c = str_char_at(src, i)
+                                        if c == 32 {
+                                            i = i + 1
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                    mut right = 0
+                                    c = str_char_at(src, i)
+                                    if c >= 48 {
+                                        if c <= 57 {
+                                            while i < n {
+                                                c = str_char_at(src, i)
+                                                if c >= 48 {
+                                                    if c <= 57 {
+                                                        right = right * 10 + (c - 48)
+                                                        i = i + 1
+                                                    } else {
+                                                        break
+                                                    }
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                        } else {
+                                            mut ra = i
+                                            while i < n {
+                                                c = str_char_at(src, i)
+                                                if c >= 97 {
+                                                    if c <= 122 {
+                                                        i = i + 1
+                                                    } else {
+                                                        if c >= 48 {
+                                                            if c <= 57 {
+                                                                i = i + 1
+                                                            } else {
+                                                                if c == 95 {
+                                                                    i = i + 1
+                                                                } else {
+                                                                    break
+                                                                }
+                                                            }
+                                                        } else {
+                                                            if c == 95 {
+                                                                i = i + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                            right = map_get(env, str_slice(src, ra, i))
+                                        }
+                                    } else {
+                                        mut ra3 = i
+                                        while i < n {
+                                            c = str_char_at(src, i)
+                                            if c >= 97 {
+                                                if c <= 122 {
+                                                    i = i + 1
+                                                } else {
+                                                    if c >= 48 {
+                                                        if c <= 57 {
+                                                            i = i + 1
+                                                        } else {
+                                                            if c == 95 {
+                                                                i = i + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        }
+                                                    } else {
+                                                        if c == 95 {
+                                                            i = i + 1
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                        right = map_get(env, str_slice(src, ra3, i))
+                                    }
+                                    left = left + right
+                                }
+                            }
+                            ir_body = str_concat(ir_body, "  call i32 (ptr, ...) @printf(ptr %f, i64 ")
+                            ir_body = str_concat(ir_body, str_from_num(left))
+                            ir_body = str_concat(ir_body, ")\n")
+                            prints = prints + 1
+                        } else {
+                            i = i + 1
                         }
+                    } else {
+                        i = i + 1
+                    }
+                } else {
+                    // multi-letter assign
+                    if c >= 97 {
+                        if c <= 122 {
+                            mut aa = i
+                            while i < n {
+                                c = str_char_at(src, i)
+                                if c >= 97 {
+                                    if c <= 122 {
+                                        i = i + 1
+                                    } else {
+                                        if c >= 48 {
+                                            if c <= 57 {
+                                                i = i + 1
+                                            } else {
+                                                if c == 95 {
+                                                    i = i + 1
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                        } else {
+                                            if c == 95 {
+                                                i = i + 1
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    if c >= 65 {
+                                        if c <= 90 {
+                                            i = i + 1
+                                        } else {
+                                            break
+                                        }
+                                    } else {
+                                        break
+                                    }
+                                }
+                            }
+                            mut aname = str_slice(src, aa, i)
+                            while i < n {
+                                c = str_char_at(src, i)
+                                if c == 32 {
+                                    i = i + 1
+                                } else {
+                                    break
+                                }
+                            }
+                            if i < n {
+                                if str_char_at(src, i) == 61 {
+                                    i = i + 1
+                                    while i < n {
+                                        c = str_char_at(src, i)
+                                        if c == 32 {
+                                            i = i + 1
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                    mut av = 0
+                                    c = str_char_at(src, i)
+                                    if c >= 48 {
+                                        if c <= 57 {
+                                            while i < n {
+                                                c = str_char_at(src, i)
+                                                if c >= 48 {
+                                                    if c <= 57 {
+                                                        av = av * 10 + (c - 48)
+                                                        i = i + 1
+                                                    } else {
+                                                        break
+                                                    }
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                        } else {
+                                            mut ba = i
+                                            while i < n {
+                                                c = str_char_at(src, i)
+                                                if c >= 97 {
+                                                    if c <= 122 {
+                                                        i = i + 1
+                                                    } else {
+                                                        if c >= 48 {
+                                                            if c <= 57 {
+                                                                i = i + 1
+                                                            } else {
+                                                                if c == 95 {
+                                                                    i = i + 1
+                                                                } else {
+                                                                    break
+                                                                }
+                                                            }
+                                                        } else {
+                                                            if c == 95 {
+                                                                i = i + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                            av = map_get(env, str_slice(src, ba, i))
+                                        }
+                                    } else {
+                                        mut ba4 = i
+                                        while i < n {
+                                            c = str_char_at(src, i)
+                                            if c >= 97 {
+                                                if c <= 122 {
+                                                    i = i + 1
+                                                } else {
+                                                    if c >= 48 {
+                                                        if c <= 57 {
+                                                            i = i + 1
+                                                        } else {
+                                                            if c == 95 {
+                                                                i = i + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        }
+                                                    } else {
+                                                        if c == 95 {
+                                                            i = i + 1
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                break
+                                            }
+                                        }
+                                        av = map_get(env, str_slice(src, ba4, i))
+                                    }
+                                    while i < n {
+                                        c = str_char_at(src, i)
+                                        if c == 32 {
+                                            i = i + 1
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                    if i < n {
+                                        if str_char_at(src, i) == 43 {
+                                            i = i + 1
+                                            while i < n {
+                                                c = str_char_at(src, i)
+                                                if c == 32 {
+                                                    i = i + 1
+                                                } else {
+                                                    break
+                                                }
+                                            }
+                                            mut rv = 0
+                                            c = str_char_at(src, i)
+                                            if c >= 48 {
+                                                if c <= 57 {
+                                                    while i < n {
+                                                        c = str_char_at(src, i)
+                                                        if c >= 48 {
+                                                            if c <= 57 {
+                                                                rv = rv * 10 + (c - 48)
+                                                                i = i + 1
+                                                            } else {
+                                                                break
+                                                            }
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                } else {
+                                                    mut ra = i
+                                                    while i < n {
+                                                        c = str_char_at(src, i)
+                                                        if c >= 97 {
+                                                            if c <= 122 {
+                                                                i = i + 1
+                                                            } else {
+                                                                if c >= 48 {
+                                                                    if c <= 57 {
+                                                                        i = i + 1
+                                                                    } else {
+                                                                        if c == 95 {
+                                                                            i = i + 1
+                                                                        } else {
+                                                                            break
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    if c == 95 {
+                                                                        i = i + 1
+                                                                    } else {
+                                                                        break
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            break
+                                                        }
+                                                    }
+                                                    rv = map_get(env, str_slice(src, ra, i))
+                                                }
+                                            } else {
+                                                mut ra5 = i
+                                                while i < n {
+                                                    c = str_char_at(src, i)
+                                                    if c >= 97 {
+                                                        if c <= 122 {
+                                                            i = i + 1
+                                                        } else {
+                                                            if c >= 48 {
+                                                                if c <= 57 {
+                                                                    i = i + 1
+                                                                } else {
+                                                                    if c == 95 {
+                                                                        i = i + 1
+                                                                    } else {
+                                                                        break
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                if c == 95 {
+                                                                    i = i + 1
+                                                                } else {
+                                                                    break
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        break
+                                                    }
+                                                }
+                                                rv = map_get(env, str_slice(src, ra5, i))
+                                            }
+                                            av = av + rv
+                                        }
+                                    }
+                                    map_set(env, aname, av)
+                                    assigns = assigns + 1
+                                }
+                            }
+                        } else {
+                            i = i + 1
+                        }
+                    } else {
+                        i = i + 1
                     }
                 }
             }
@@ -217,7 +1478,11 @@ fn main() {
                 i = i + 1
                 break
             } else {
-                i = i + 1
+                if c == 125 {
+                    break
+                } else {
+                    i = i + 1
+                }
             }
         }
     }
@@ -233,5 +1498,7 @@ fn main() {
     print from_file
     print assigns
     print prints
+    print loops
+    print ifs
     print str_len(ir)
 }

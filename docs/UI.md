@@ -39,3 +39,9 @@ Today the default backend remains **HTML export** (`ui_begin` … `ui_end` → `
 ## ui_window_show (v0.32+)
 
 Win32: real HWND with static text and OK button. Other platforms: HTML export via ui_begin/end.
+
+
+## Platform hosts (v0.37)
+
+- `ui_cocoa_alert(title, msg)` — macOS osascript dialog
+- Android: `MainActivity` loads `libpureapp` and can call `purelangMain()`

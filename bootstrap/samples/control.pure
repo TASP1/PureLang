@@ -1,0 +1,15 @@
+sum = 0
+i = 0
+while i < 5 {
+  sum = sum + i
+  i = i + 1
+}
+print sum
+if sum > 9 {
+  print 1
+}
+if sum < 1 {
+  print 0
+}
+count = 42
+print count

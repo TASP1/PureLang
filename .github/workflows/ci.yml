@@ -31,6 +31,7 @@ jobs:
           test -f docs/SYNTAX.md
           test -f docs/COMPILER.md
           test -f docs/ROADMAP.md
+          test -f docs/STORE_SIGNING.md
           test -f docs/PLATFORMS.md
           test -f LICENSE
           for f in hello game_loop funcs structs lists list_loop methods enums ownership typed_params try_op modules generics traits visibility stdlib file_io list_helpers strings list_stats time_exit net_sleep channels strings_index fn_values thread_spawn bootstrap_lexer bootstrap_parser ui_native while_loop maps ui_demo; do

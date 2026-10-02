@@ -1,21 +1,40 @@
-# PureLang completion status (v0.36.0)
+# PureLang completion status (v0.37.0)
 
-Honest snapshot of the five “complete all” tracks.
+Honest snapshot of language, tooling, and product tracks.
 
-| Track | MVP shipped | Production-complete? |
-|-------|-------------|----------------------|
-| **Threads / channels** | `channel_new/send/recv/len`, `thread_spawn_send` (pthread) | Yes (MVP) — Unix pthread; Windows CreateThread + CRITICAL_SECTION/CONDITION_VARIABLE |
-| **HTTPS / TLS** | `https://` via system `curl`; `http://` via sockets | Expanded — WinInet (Windows); OpenSSL on Unix (no CLI when libssl present) |
-| **Native UI** | HTML export + `ui_native_available()==0` | Expanded — Win32 window+edit+listbox+button; HTML elsewhere; not full Cocoa/Android SDKs |
-| **iOS / Android sysroots** | `scripts/android_build.sh`, `ios_build.sh`, `--platform` | Expanded — NDK job + packaging artifacts; not Play/App Store submission |
-| **Self-hosting** | `bootstrap/` seed programs | Expanded — purec_mini.pure emits .ll for print N; production purec still Rust |
+## Overall completion (weighted estimate)
 
-## What “done” means here
+| Area | Weight | Done | Notes |
+|------|--------|------|-------|
+| Core language (syntax → native) | 25% | **90%** | Full purec in Rust; gaps: richer types, GC-free edge cases |
+| Stdlib / runtime | 15% | **75%** | Maps, strings, files, HTTPS, threads; partial UI |
+| Self-host purec_sub | 15% | **45%** | if/while, multi-letter ids, + , file in; no modules/types/fns yet |
+| Tooling (LSP, fmt, pkg, CI) | 15% | **80%** | CI multi-OS, NDK/iOS checks, packages |
+| Mobile hosts | 10% | **40%** | Gradle host Activity + JNI slot; Cocoa alert path |
+| Store pipelines | 10% | **35%** | Package trees + **STORE_SIGNING.md**; no auto-upload |
+| Native UI SDKs | 10% | **30%** | Win32 widgets; HTML; not full UIKit/Jetpack |
 
-These foundations are **usable for demos and further development**. They are **not** substitutes for mature runtimes (Tokio, NSURLSession, SwiftUI, full purec-in-PureLang).
+**Weighted overall ≈ 62%** toward a “production systems language product.”  
+**Compiler usable today ≈ 85%** for learning/demos/native tools on desktop.
 
-Next: grow `purec_sub` (if/while/fns) → modules; deepen Android/Cocoa hosts; store signing docs.
+## Track detail
 
+| Track | Status |
+|-------|--------|
+| Threads / channels | MVP complete (Unix + Windows) |
+| HTTPS / TLS | OpenSSL Unix + WinInet Windows |
+| Native UI | Win32 + HTML + Cocoa alert helper |
+| iOS / Android | Scripts + Gradle host + signing docs |
+| Self-hosting | purec_sub: assign, print, +, **if**, **while**, multi-letter ids |
+
+## v0.37.0
+- purec_sub: **if** / **while** (compile-time interpret), multi-letter identifiers
+- sample `bootstrap/samples/control.pure` → IR prints 10, 1, 42
+- docs/STORE_SIGNING.md (Play AAB + iOS archive, no auto-upload)
+- Deeper Android MainActivity (JNI run button); `ui_cocoa_alert`
 
 ## v0.36.0
-- str_char_at / str_slice — bootstrap lexer progress
+- purec_sub arithmetic + file input; letter/digit parse fix
+
+## Prior
+See git history from v0.28–v0.35 (function values, OpenSSL, Win32, packaging, golden tests).

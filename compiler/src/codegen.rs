@@ -1429,6 +1429,16 @@ impl Codegen {
                         );
                         return (res, VarKind::Number);
                     }
+                    if builtin == "ui_cocoa_alert" {
+                        let (a, _) = self.emit_expr(&args[0]);
+                        let (b, _) = self.emit_expr(&args[1]);
+                        let _ = writeln!(
+                            self.body,
+                            "  call void @pl_ui_cocoa_alert(ptr {}, ptr {})",
+                            a, b
+                        );
+                        return ("0".into(), VarKind::Number);
+                    }
                     if builtin == "ui_alert" {
                         let (a, _) = self.emit_expr(&args[0]);
                         let (b, _) = self.emit_expr(&args[1]);
