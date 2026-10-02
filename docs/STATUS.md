@@ -1,4 +1,4 @@
-# PureLang completion status (v0.35.0)
+# PureLang completion status (v0.36.0)
 
 Honest snapshot of the five “complete all” tracks.
 
@@ -14,8 +14,8 @@ Honest snapshot of the five “complete all” tracks.
 
 These foundations are **usable for demos and further development**. They are **not** substitutes for mature runtimes (Tokio, NSURLSession, SwiftUI, full purec-in-PureLang).
 
-Next engineering priority: **`thread_spawn(fn)`** using function values; then Windows threads/channels; then self-host lexer growth.
+Next: grow `purec_sub` (if/while/fns) → modules; deepen Android/Cocoa hosts; store signing docs.
 
 
-## v0.35.0
+## v0.36.0
 - str_char_at / str_slice — bootstrap lexer progress

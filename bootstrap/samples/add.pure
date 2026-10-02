@@ -1,0 +1,4 @@
+x = 40
+y = 2
+print x + y
+print 7
